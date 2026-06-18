@@ -6,7 +6,7 @@ import type { EChartsOption } from 'echarts'
 import Card from '@/components/ui/Card'
 import MetricCard from '@/components/ui/MetricCard'
 import Table from '@/components/ui/Table'
-import { getSpaceList, getUsageComparison, getScheduleRecommendations, getSpaceTypeSummary, getHourlyUsageTrend } from '@/services/mock/space'
+import { getSpaceList, getUsageComparison, getScheduleRecommendations, getSpaceTypeSummary, getHourlyUsageTrend, getUsageComparisonFiltered, getSpaceTypeSummaryFiltered, getHourlyUsageTrendFiltered, getScheduleRecommendationsFiltered } from '@/services/mock/space'
 import { chartTheme, commonChartOption } from '@/utils/chartTheme'
 import { cn } from '@/lib/utils'
 import type { SpaceType } from '@/types/space'
@@ -20,11 +20,30 @@ interface SpaceAnalysisProps {
 export default function SpaceAnalysis({ levelFilter, genderFilter, ageGroupFilter }: SpaceAnalysisProps) {
   const [selectedSpaceId, setSelectedSpaceId] = useState<string>('S0001')
 
+  const hasFilter = useMemo(() =>
+    (levelFilter && levelFilter !== '全部') ||
+    (genderFilter && genderFilter !== '全部') ||
+    (ageGroupFilter && ageGroupFilter !== '全部'),
+    [levelFilter, genderFilter, ageGroupFilter]
+  )
+
   const spaces = useMemo(() => getSpaceList(), [])
-  const usageComparison = useMemo(() => getUsageComparison(), [])
-  const scheduleRecommendations = useMemo(() => getScheduleRecommendations(), [])
-  const spaceTypeSummary = useMemo(() => getSpaceTypeSummary(), [])
-  const hourlyUsageTrend = useMemo(() => getHourlyUsageTrend(selectedSpaceId), [selectedSpaceId])
+  const usageComparison = useMemo(
+    () => hasFilter ? getUsageComparisonFiltered(levelFilter, genderFilter, ageGroupFilter) : getUsageComparison(),
+    [hasFilter, levelFilter, genderFilter, ageGroupFilter]
+  )
+  const scheduleRecommendations = useMemo(
+    () => hasFilter ? getScheduleRecommendationsFiltered(levelFilter, genderFilter, ageGroupFilter) : getScheduleRecommendations(),
+    [hasFilter, levelFilter, genderFilter, ageGroupFilter]
+  )
+  const spaceTypeSummary = useMemo(
+    () => hasFilter ? getSpaceTypeSummaryFiltered(levelFilter, genderFilter, ageGroupFilter) : getSpaceTypeSummary(),
+    [hasFilter, levelFilter, genderFilter, ageGroupFilter]
+  )
+  const hourlyUsageTrend = useMemo(
+    () => hasFilter ? getHourlyUsageTrendFiltered(selectedSpaceId, levelFilter, genderFilter, ageGroupFilter) : getHourlyUsageTrend(selectedSpaceId),
+    [hasFilter, selectedSpaceId, levelFilter, genderFilter, ageGroupFilter]
+  )
 
   const selectedSpace = useMemo(() => spaces.find(s => s.id === selectedSpaceId) || spaces[0], [spaces, selectedSpaceId])
 

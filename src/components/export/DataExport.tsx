@@ -89,47 +89,73 @@ export default function DataExport() {
     setSelectedTypes(newSelected)
   }
 
+  const filterByDateRange = <T extends Record<string, unknown>>(data: T[], dateField: string): T[] => {
+    const start = dayjs(dateRange.start).startOf('day')
+    const end = dayjs(dateRange.end).endOf('day')
+    return data.filter(item => {
+      const val = item[dateField]
+      if (typeof val !== 'string') return true
+      const d = dayjs(val)
+      return d.isAfter(start) && d.isBefore(end)
+    })
+  }
+
   const generateExcelData = async (type: ExportType) => {
     switch (type) {
-      case 'members':
-        return generateMembers().map(m => ({
-          会员ID: m.id,
-          姓名: m.name,
-          会员等级: m.level,
-          性别: m.gender,
-          年龄: m.age,
-          年龄段: m.ageGroup,
-          入会日期: m.joinDate,
-          累计消费: m.totalSpend,
-          到店次数: m.visitCount,
-          最后到店: m.lastVisit,
-          联系电话: m.phone,
-        }))
-      case 'consumption':
-        return generateConsumptionRecords().map(r => ({
-          记录ID: r.id,
-          会员ID: r.memberId,
-          消费类目: r.category,
-          消费子类目: r.subCategory,
-          消费金额: r.amount,
-          消费日期: r.date,
-          消费时间: r.time,
-          星期: r.weekday,
-          支付方式: r.paymentMethod,
-        }))
-      case 'rfm':
-        return generateRFMScores().map(s => ({
-          会员ID: s.memberId,
-          最近消费天数: s.lastConsumeDays,
-          消费频率: s.consumeFrequency,
-          消费金额: s.consumeAmount,
-          R评分: s.recency,
-          F评分: s.frequency,
-          M评分: s.monetary,
-          RFM总分: s.totalScore,
-          会员群体: s.segment,
-          风险等级: s.riskLevel,
-        }))
+      case 'members': {
+        const members = filterByDateRange(
+          generateMembers().map(m => ({
+            会员ID: m.id,
+            姓名: m.name,
+            会员等级: m.level,
+            性别: m.gender,
+            年龄: m.age,
+            年龄段: m.ageGroup,
+            入会日期: m.joinDate,
+            累计消费: m.totalSpend,
+            到店次数: m.visitCount,
+            最后到店: m.lastVisit,
+            联系电话: m.phone,
+          })),
+          '最后到店'
+        )
+        return members
+      }
+      case 'consumption': {
+        const records = filterByDateRange(
+          generateConsumptionRecords().map(r => ({
+            记录ID: r.id,
+            会员ID: r.memberId,
+            消费类目: r.category,
+            消费子类目: r.subCategory,
+            消费金额: r.amount,
+            消费日期: r.date,
+            消费时间: r.time,
+            星期: r.weekday,
+            支付方式: r.paymentMethod,
+          })),
+          '消费日期'
+        )
+        return records
+      }
+      case 'rfm': {
+        const scores = filterByDateRange(
+          generateRFMScores().map(s => ({
+            会员ID: s.memberId,
+            最近消费天数: s.lastConsumeDays,
+            消费频率: s.consumeFrequency,
+            消费金额: s.consumeAmount,
+            R评分: s.recency,
+            F评分: s.frequency,
+            M评分: s.monetary,
+            RFM总分: s.totalScore,
+            会员群体: s.segment,
+            风险等级: s.riskLevel,
+          })),
+          '会员ID'
+        )
+        return scores
+      }
       case 'space':
         return getSpaceList().map(s => ({
           场地ID: s.id,
@@ -139,15 +165,20 @@ export default function DataExport() {
           位置: s.location,
           描述: s.description,
         }))
-      case 'recommendation':
-        return getRecommendationEffect().map(e => ({
-          日期: e.date,
-          展示量: e.impressions,
-          点击量: e.clicks,
-          转化量: e.conversions,
-          点击率: `${e.ctr}%`,
-          转化率: `${e.conversionRate}%`,
-        }))
+      case 'recommendation': {
+        const effects = filterByDateRange(
+          getRecommendationEffect().map(e => ({
+            日期: e.date,
+            展示量: e.impressions,
+            点击量: e.clicks,
+            转化量: e.conversions,
+            点击率: `${e.ctr}%`,
+            转化率: `${e.conversionRate}%`,
+          })),
+          '日期'
+        )
+        return effects
+      }
       default:
         return []
     }
@@ -188,7 +219,7 @@ export default function DataExport() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `会所数据分析_${dayjs().format('YYYYMMDD')}.xlsx`
+    a.download = `会所数据分析_${dateRange.start}_${dateRange.end}.xlsx`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -208,7 +239,7 @@ export default function DataExport() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `会所_${option.label}_${dayjs().format('YYYYMMDD')}.csv`
+      a.download = `会所_${option.label}_${dateRange.start}_${dateRange.end}.csv`
       a.click()
       URL.revokeObjectURL(url)
 
@@ -286,7 +317,7 @@ export default function DataExport() {
       }
     }
 
-    doc.save(`会所数据分析报告_${dayjs().format('YYYYMMDD')}.pdf`)
+    doc.save(`会所数据分析报告_${dateRange.start}_${dateRange.end}.pdf`)
   }
 
   const handleExport = async () => {
@@ -445,6 +476,9 @@ export default function DataExport() {
                     />
                   </div>
                 </div>
+                <p className="mt-2 text-xs text-gray-400">
+                  仅导出 {dateRange.start} 至 {dateRange.end} 范围内的数据（消费记录、推荐效果等按日期筛选，会员数据按最后到店日期筛选）
+                </p>
               </div>
 
               <div className="mb-6">

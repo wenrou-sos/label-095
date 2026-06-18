@@ -1,5 +1,7 @@
 import dayjs from 'dayjs'
 import type { Space, SpaceUsage, ScheduleRecommendation, UsageComparison, SpaceType } from '../../types/space'
+import { generateMembers, generateConsumptionRecords } from './members'
+import type { MemberLevel, Gender, AgeGroup } from '../../types/member'
 import { getWeekdayName, isWeekend } from '../../utils/date'
 
 const spaceConfigs: Array<{
@@ -281,4 +283,156 @@ export function getHourlyUsageTrend(spaceId: string): {
     weekdayAvg: hours.map(h => parseFloat(avg(weekdayData.get(h) || []).toFixed(1))),
     weekendAvg: hours.map(h => parseFloat(avg(weekendData.get(h) || []).toFixed(1)))
   }
+}
+
+const spaceTypeCategoryMap: Record<SpaceType, string[]> = {
+  '餐厅': ['餐饮'],
+  '酒吧': ['酒水'],
+  'SPA中心': ['SPA'],
+  '棋牌室': ['棋牌'],
+  '客房': ['客房'],
+  '会议室': ['餐饮', '酒水'],
+}
+
+function getFilteredMemberIds(
+  levelFilter?: string,
+  genderFilter?: string,
+  ageGroupFilter?: string
+): Set<string> | null {
+  const hasFilter =
+    (levelFilter && levelFilter !== '全部') ||
+    (genderFilter && genderFilter !== '全部') ||
+    (ageGroupFilter && ageGroupFilter !== '全部')
+
+  if (!hasFilter) return null
+
+  const members = generateMembers()
+  return new Set(
+    members
+      .filter(m => {
+        if (levelFilter && levelFilter !== '全部' && m.level !== levelFilter) return false
+        if (genderFilter && genderFilter !== '全部' && m.gender !== genderFilter) return false
+        if (ageGroupFilter && ageGroupFilter !== '全部' && m.ageGroup !== ageGroupFilter) return false
+        return true
+      })
+      .map(m => m.id)
+  )
+}
+
+function getSpaceTypeUsageWeight(
+  spaceType: SpaceType,
+  memberIds: Set<string> | null
+): number {
+  if (!memberIds) return 1
+
+  const records = generateConsumptionRecords()
+  const relatedCategories = spaceTypeCategoryMap[spaceType]
+
+  const filteredRecords = records.filter(
+    r => memberIds.has(r.memberId) && relatedCategories.includes(r.category)
+  )
+  const totalRecords = records.filter(
+    r => relatedCategories.includes(r.category)
+  )
+
+  if (totalRecords.length === 0) return 1
+  return filteredRecords.length / totalRecords.length
+}
+
+export function getUsageComparisonFiltered(
+  levelFilter?: string,
+  genderFilter?: string,
+  ageGroupFilter?: string
+): UsageComparison[] {
+  const base = getUsageComparison()
+  const memberIds = getFilteredMemberIds(levelFilter, genderFilter, ageGroupFilter)
+
+  if (!memberIds) return base
+
+  return base.map(item => {
+    const space = generateSpaces().find(s => s.name === item.space)
+    if (!space) return item
+
+    const weight = getSpaceTypeUsageWeight(space.type, memberIds)
+
+    return {
+      ...item,
+      weekdayEvening: parseFloat((item.weekdayEvening * weight).toFixed(1)),
+      weekend: parseFloat((item.weekend * weight).toFixed(1)),
+    }
+  })
+}
+
+export function getSpaceTypeSummaryFiltered(
+  levelFilter?: string,
+  genderFilter?: string,
+  ageGroupFilter?: string
+): {
+  type: SpaceType
+  count: number
+  totalCapacity: number
+  avgUsageRate: number
+  avgSatisfaction: number
+}[] {
+  const base = getSpaceTypeSummary()
+  const memberIds = getFilteredMemberIds(levelFilter, genderFilter, ageGroupFilter)
+
+  if (!memberIds) return base
+
+  return base.map(item => {
+    const weight = getSpaceTypeUsageWeight(item.type, memberIds)
+    const satisfactionShift = memberIds.size < 250 ? 0.15 : -0.05
+
+    return {
+      ...item,
+      avgUsageRate: parseFloat(Math.min(100, item.avgUsageRate * weight).toFixed(1)),
+      avgSatisfaction: parseFloat(Math.min(5, Math.max(3, item.avgSatisfaction + satisfactionShift)).toFixed(2)),
+    }
+  })
+}
+
+export function getHourlyUsageTrendFiltered(
+  spaceId: string,
+  levelFilter?: string,
+  genderFilter?: string,
+  ageGroupFilter?: string
+): {
+  hours: number[]
+  weekdayAvg: number[]
+  weekendAvg: number[]
+} {
+  const base = getHourlyUsageTrend(spaceId)
+  const memberIds = getFilteredMemberIds(levelFilter, genderFilter, ageGroupFilter)
+
+  if (!memberIds) return base
+
+  const space = generateSpaces().find(s => s.id === spaceId)
+  if (!space) return base
+
+  const weight = getSpaceTypeUsageWeight(space.type, memberIds)
+
+  return {
+    hours: base.hours,
+    weekdayAvg: base.weekdayAvg.map(v => parseFloat(Math.min(100, v * weight).toFixed(1))),
+    weekendAvg: base.weekendAvg.map(v => parseFloat(Math.min(100, v * weight).toFixed(1))),
+  }
+}
+
+export function getScheduleRecommendationsFiltered(
+  levelFilter?: string,
+  genderFilter?: string,
+  ageGroupFilter?: string
+): ScheduleRecommendation[] {
+  const base = getScheduleRecommendations()
+  const memberIds = getFilteredMemberIds(levelFilter, genderFilter, ageGroupFilter)
+
+  if (!memberIds) return base
+
+  const ratio = memberIds.size / generateMembers().length
+
+  return base.map(item => ({
+    ...item,
+    requiredStaff: Math.max(1, Math.round(item.requiredStaff * ratio)),
+    costEstimate: Math.max(200, Math.round(item.costEstimate * ratio)),
+  }))
 }
