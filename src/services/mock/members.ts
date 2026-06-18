@@ -122,7 +122,8 @@ function generateMember(id: string, level: MemberLevel): Member {
     visitCount: baseVisits,
     lastVisit: dayjs().subtract(randomInt(1, 180), 'day').format('YYYY-MM-DD'),
     phone: generatePhone(),
-    avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${id}`
+    avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${id}`,
+    tags: [],
   }
 }
 
@@ -201,6 +202,15 @@ export function generateMembers(): Member[] {
   for (let i = 0; i < 500; i++) {
     const member = generateMember(`M${(i + 1).toString().padStart(4, '0')}`, shuffledLevels[i])
     members.push(member)
+  }
+
+  try {
+    const tagsModule = require('./tags') as typeof import('./tags')
+    members.forEach(member => {
+      member.tags = tagsModule.getMemberTags(member.id)
+    })
+  } catch {
+    // ignore if tags module not available yet
   }
 
   membersCache = members

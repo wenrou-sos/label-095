@@ -46,6 +46,7 @@ export interface Member {
   lastVisit: string;
   phone: string;
   avatar: string;
+  tags: string[];
 }
 
 /**

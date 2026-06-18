@@ -16,9 +16,11 @@ interface ConsumptionAnalysisProps {
   levelFilter?: string
   genderFilter?: string
   ageGroupFilter?: string
+  tagFilterIds?: string[]
+  tagMatchAll?: boolean
 }
 
-export default function ConsumptionAnalysis({ levelFilter, genderFilter, ageGroupFilter }: ConsumptionAnalysisProps) {
+export default function ConsumptionAnalysis({ levelFilter, genderFilter, ageGroupFilter, tagFilterIds = [], tagMatchAll = false }: ConsumptionAnalysisProps) {
   const [granularity, setGranularity] = useState<'month' | 'quarter'>('month')
   const [selectedDimension, setSelectedDimension] = useState<'level' | 'gender' | 'ageGroup'>('level')
 
@@ -41,8 +43,16 @@ export default function ConsumptionAnalysis({ levelFilter, genderFilter, ageGrou
     if (ageGroupFilter && ageGroupFilter !== '全部') {
       data = data.filter(m => m.ageGroup === ageGroupFilter)
     }
+    if (tagFilterIds.length > 0) {
+      data = data.filter(m => {
+        if (tagMatchAll) {
+          return tagFilterIds.every(tid => m.tags.includes(tid))
+        }
+        return tagFilterIds.some(tid => m.tags.includes(tid))
+      })
+    }
     return data
-  }, [members, levelFilter, genderFilter, ageGroupFilter])
+  }, [members, levelFilter, genderFilter, ageGroupFilter, tagFilterIds, tagMatchAll])
 
   const totalConsumption = useMemo(() => {
     return categoryBreakdown.reduce((sum, item) => sum + item.value, 0)

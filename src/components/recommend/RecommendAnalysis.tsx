@@ -15,9 +15,11 @@ interface RecommendAnalysisProps {
   levelFilter?: string
   genderFilter?: string
   ageGroupFilter?: string
+  tagFilterIds?: string[]
+  tagMatchAll?: boolean
 }
 
-export default function RecommendAnalysis({ levelFilter, genderFilter, ageGroupFilter }: RecommendAnalysisProps) {
+export default function RecommendAnalysis({ levelFilter, genderFilter, ageGroupFilter, tagFilterIds = [], tagMatchAll = false }: RecommendAnalysisProps) {
   const [selectedMemberId, setSelectedMemberId] = useState<string>('M0001')
   const [activeTab, setActiveTab] = useState<'wine' | 'activity'>('wine')
 
@@ -36,8 +38,16 @@ export default function RecommendAnalysis({ levelFilter, genderFilter, ageGroupF
     if (ageGroupFilter && ageGroupFilter !== '全部') {
       data = data.filter(m => m.ageGroup === ageGroupFilter)
     }
+    if (tagFilterIds.length > 0) {
+      data = data.filter(m => {
+        if (tagMatchAll) {
+          return tagFilterIds.every(tid => m.tags.includes(tid))
+        }
+        return tagFilterIds.some(tid => m.tags.includes(tid))
+      })
+    }
     return data
-  }, [members, levelFilter, genderFilter, ageGroupFilter])
+  }, [members, levelFilter, genderFilter, ageGroupFilter, tagFilterIds, tagMatchAll])
 
   const filteredMemberIds = useMemo(() => filteredMembers.map(m => m.id), [filteredMembers])
 

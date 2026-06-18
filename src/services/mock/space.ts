@@ -297,22 +297,31 @@ const spaceTypeCategoryMap: Record<SpaceType, string[]> = {
 function getFilteredMemberIds(
   levelFilter?: string,
   genderFilter?: string,
-  ageGroupFilter?: string
+  ageGroupFilter?: string,
+  tagFilterIds?: string[],
+  tagMatchAll: boolean = false
 ): Set<string> | null {
-  const hasFilter =
-    (levelFilter && levelFilter !== '全部') ||
-    (genderFilter && genderFilter !== '全部') ||
-    (ageGroupFilter && ageGroupFilter !== '全部')
+  const hasLevelFilter = levelFilter && levelFilter !== '全部'
+  const hasGenderFilter = genderFilter && genderFilter !== '全部'
+  const hasAgeGroupFilter = ageGroupFilter && ageGroupFilter !== '全部'
+  const hasTagFilter = tagFilterIds && tagFilterIds.length > 0
 
-  if (!hasFilter) return null
+  if (!hasLevelFilter && !hasGenderFilter && !hasAgeGroupFilter && !hasTagFilter) return null
 
   const members = generateMembers()
   return new Set(
     members
       .filter(m => {
-        if (levelFilter && levelFilter !== '全部' && m.level !== levelFilter) return false
-        if (genderFilter && genderFilter !== '全部' && m.gender !== genderFilter) return false
-        if (ageGroupFilter && ageGroupFilter !== '全部' && m.ageGroup !== ageGroupFilter) return false
+        if (hasLevelFilter && m.level !== levelFilter) return false
+        if (hasGenderFilter && m.gender !== genderFilter) return false
+        if (hasAgeGroupFilter && m.ageGroup !== ageGroupFilter) return false
+        if (hasTagFilter) {
+          if (tagMatchAll) {
+            if (!tagFilterIds!.every(tid => m.tags.includes(tid))) return false
+          } else {
+            if (!tagFilterIds!.some(tid => m.tags.includes(tid))) return false
+          }
+        }
         return true
       })
       .map(m => m.id)
@@ -342,10 +351,12 @@ function getSpaceTypeUsageWeight(
 export function getUsageComparisonFiltered(
   levelFilter?: string,
   genderFilter?: string,
-  ageGroupFilter?: string
+  ageGroupFilter?: string,
+  tagFilterIds?: string[],
+  tagMatchAll?: boolean
 ): UsageComparison[] {
   const base = getUsageComparison()
-  const memberIds = getFilteredMemberIds(levelFilter, genderFilter, ageGroupFilter)
+  const memberIds = getFilteredMemberIds(levelFilter, genderFilter, ageGroupFilter, tagFilterIds, tagMatchAll)
 
   if (!memberIds) return base
 
@@ -366,7 +377,9 @@ export function getUsageComparisonFiltered(
 export function getSpaceTypeSummaryFiltered(
   levelFilter?: string,
   genderFilter?: string,
-  ageGroupFilter?: string
+  ageGroupFilter?: string,
+  tagFilterIds?: string[],
+  tagMatchAll?: boolean
 ): {
   type: SpaceType
   count: number
@@ -375,7 +388,7 @@ export function getSpaceTypeSummaryFiltered(
   avgSatisfaction: number
 }[] {
   const base = getSpaceTypeSummary()
-  const memberIds = getFilteredMemberIds(levelFilter, genderFilter, ageGroupFilter)
+  const memberIds = getFilteredMemberIds(levelFilter, genderFilter, ageGroupFilter, tagFilterIds, tagMatchAll)
 
   if (!memberIds) return base
 
@@ -395,14 +408,16 @@ export function getHourlyUsageTrendFiltered(
   spaceId: string,
   levelFilter?: string,
   genderFilter?: string,
-  ageGroupFilter?: string
+  ageGroupFilter?: string,
+  tagFilterIds?: string[],
+  tagMatchAll?: boolean
 ): {
   hours: number[]
   weekdayAvg: number[]
   weekendAvg: number[]
 } {
   const base = getHourlyUsageTrend(spaceId)
-  const memberIds = getFilteredMemberIds(levelFilter, genderFilter, ageGroupFilter)
+  const memberIds = getFilteredMemberIds(levelFilter, genderFilter, ageGroupFilter, tagFilterIds, tagMatchAll)
 
   if (!memberIds) return base
 
@@ -421,10 +436,12 @@ export function getHourlyUsageTrendFiltered(
 export function getScheduleRecommendationsFiltered(
   levelFilter?: string,
   genderFilter?: string,
-  ageGroupFilter?: string
+  ageGroupFilter?: string,
+  tagFilterIds?: string[],
+  tagMatchAll?: boolean
 ): ScheduleRecommendation[] {
   const base = getScheduleRecommendations()
-  const memberIds = getFilteredMemberIds(levelFilter, genderFilter, ageGroupFilter)
+  const memberIds = getFilteredMemberIds(levelFilter, genderFilter, ageGroupFilter, tagFilterIds, tagMatchAll)
 
   if (!memberIds) return base
 

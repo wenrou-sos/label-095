@@ -11,6 +11,7 @@ import {
   Download,
   ChevronLeft,
   ChevronRight,
+  Tag,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -69,6 +70,12 @@ const menuItems: MenuItem[] = [
     label: '数据导出',
     icon: <Download className="h-5 w-5" />,
     path: '/export',
+  },
+  {
+    key: 'tags',
+    label: '标签管理',
+    icon: <Tag className="h-5 w-5" />,
+    path: '/tags',
   },
 ]
 

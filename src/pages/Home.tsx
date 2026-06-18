@@ -1,9 +1,11 @@
 import { useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { BarChart3, Users, ShoppingBag, MapPin, Sparkles, Crown, Clock, LayoutGrid, Wine, Calendar } from 'lucide-react'
+import { BarChart3, Users, ShoppingBag, MapPin, Sparkles, Crown, Clock, LayoutGrid, Wine, Calendar, Tag } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Card from '@/components/ui/Card'
 import MetricCard from '@/components/ui/MetricCard'
+import Button from '@/components/ui/Button'
 import FilterBar from '@/components/common/FilterBar'
 import DataExport from '@/components/export/DataExport'
 import RFMAnalysis from '@/components/rfm/RFMAnalysis'
@@ -29,15 +31,23 @@ const tabs = [
 ]
 
 export default function Home() {
+  const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState<TabType>('overview')
   const [levelFilter, setLevelFilter] = useState('全部')
   const [genderFilter, setGenderFilter] = useState('全部')
   const [ageGroupFilter, setAgeGroupFilter] = useState('全部')
+  const [tagFilterIds, setTagFilterIds] = useState<string[]>([])
+  const [tagMatchAll, setTagMatchAll] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
 
   const handleRefresh = useCallback(() => {
     setRefreshKey(prev => prev + 1)
   }, [])
+
+  const handleTagFilterChange = (ids: string[], matchAll: boolean) => {
+    setTagFilterIds(ids)
+    setTagMatchAll(matchAll)
+  }
 
   const overviewMetrics = useMemo(() => {
     const members = generateMembers()
@@ -225,15 +235,15 @@ export default function Home() {
       case 'overview':
         return renderOverview()
       case 'rfm':
-        return <RFMAnalysis key={`rfm-${refreshKey}`} levelFilter={levelFilter} genderFilter={genderFilter} ageGroupFilter={ageGroupFilter} />
+        return <RFMAnalysis key={`rfm-${refreshKey}`} levelFilter={levelFilter} genderFilter={genderFilter} ageGroupFilter={ageGroupFilter} tagFilterIds={tagFilterIds} tagMatchAll={tagMatchAll} />
       case 'consumption':
-        return <ConsumptionAnalysis key={`consumption-${refreshKey}`} levelFilter={levelFilter} genderFilter={genderFilter} ageGroupFilter={ageGroupFilter} />
+        return <ConsumptionAnalysis key={`consumption-${refreshKey}`} levelFilter={levelFilter} genderFilter={genderFilter} ageGroupFilter={ageGroupFilter} tagFilterIds={tagFilterIds} tagMatchAll={tagMatchAll} />
       case 'visit':
-        return <VisitAnalysis key={`visit-${refreshKey}`} levelFilter={levelFilter} genderFilter={genderFilter} ageGroupFilter={ageGroupFilter} />
+        return <VisitAnalysis key={`visit-${refreshKey}`} levelFilter={levelFilter} genderFilter={genderFilter} ageGroupFilter={ageGroupFilter} tagFilterIds={tagFilterIds} tagMatchAll={tagMatchAll} />
       case 'space':
-        return <SpaceAnalysis key={`space-${refreshKey}`} levelFilter={levelFilter} genderFilter={genderFilter} ageGroupFilter={ageGroupFilter} />
+        return <SpaceAnalysis key={`space-${refreshKey}`} levelFilter={levelFilter} genderFilter={genderFilter} ageGroupFilter={ageGroupFilter} tagFilterIds={tagFilterIds} tagMatchAll={tagMatchAll} />
       case 'recommend':
-        return <RecommendAnalysis key={`recommend-${refreshKey}`} levelFilter={levelFilter} genderFilter={genderFilter} ageGroupFilter={ageGroupFilter} />
+        return <RecommendAnalysis key={`recommend-${refreshKey}`} levelFilter={levelFilter} genderFilter={genderFilter} ageGroupFilter={ageGroupFilter} tagFilterIds={tagFilterIds} tagMatchAll={tagMatchAll} />
       default:
         return renderOverview()
     }
@@ -248,6 +258,14 @@ export default function Home() {
             <p className="mt-1 text-gray-500">全面洞察会员消费行为，助力精细化运营决策</p>
           </div>
           <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<Tag className="w-4 h-4" />}
+              onClick={() => navigate('/tags')}
+            >
+              标签管理
+            </Button>
             <DataExport />
           </div>
         </div>
@@ -277,9 +295,12 @@ export default function Home() {
             levelFilter={levelFilter}
             genderFilter={genderFilter}
             ageGroupFilter={ageGroupFilter}
+            tagFilterIds={tagFilterIds}
+            tagMatchAll={tagMatchAll}
             onLevelFilterChange={setLevelFilter}
             onGenderFilterChange={setGenderFilter}
             onAgeGroupFilterChange={setAgeGroupFilter}
+            onTagFilterChange={handleTagFilterChange}
             onRefresh={handleRefresh}
           />
         )}

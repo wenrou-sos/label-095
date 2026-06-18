@@ -15,34 +15,37 @@ interface SpaceAnalysisProps {
   levelFilter?: string
   genderFilter?: string
   ageGroupFilter?: string
+  tagFilterIds?: string[]
+  tagMatchAll?: boolean
 }
 
-export default function SpaceAnalysis({ levelFilter, genderFilter, ageGroupFilter }: SpaceAnalysisProps) {
+export default function SpaceAnalysis({ levelFilter, genderFilter, ageGroupFilter, tagFilterIds = [], tagMatchAll = false }: SpaceAnalysisProps) {
   const [selectedSpaceId, setSelectedSpaceId] = useState<string>('S0001')
 
   const hasFilter = useMemo(() =>
     (levelFilter && levelFilter !== '全部') ||
     (genderFilter && genderFilter !== '全部') ||
-    (ageGroupFilter && ageGroupFilter !== '全部'),
-    [levelFilter, genderFilter, ageGroupFilter]
+    (ageGroupFilter && ageGroupFilter !== '全部') ||
+    tagFilterIds.length > 0,
+    [levelFilter, genderFilter, ageGroupFilter, tagFilterIds]
   )
 
   const spaces = useMemo(() => getSpaceList(), [])
   const usageComparison = useMemo(
-    () => hasFilter ? getUsageComparisonFiltered(levelFilter, genderFilter, ageGroupFilter) : getUsageComparison(),
-    [hasFilter, levelFilter, genderFilter, ageGroupFilter]
+    () => hasFilter ? getUsageComparisonFiltered(levelFilter, genderFilter, ageGroupFilter, tagFilterIds, tagMatchAll) : getUsageComparison(),
+    [hasFilter, levelFilter, genderFilter, ageGroupFilter, tagFilterIds, tagMatchAll]
   )
   const scheduleRecommendations = useMemo(
-    () => hasFilter ? getScheduleRecommendationsFiltered(levelFilter, genderFilter, ageGroupFilter) : getScheduleRecommendations(),
-    [hasFilter, levelFilter, genderFilter, ageGroupFilter]
+    () => hasFilter ? getScheduleRecommendationsFiltered(levelFilter, genderFilter, ageGroupFilter, tagFilterIds, tagMatchAll) : getScheduleRecommendations(),
+    [hasFilter, levelFilter, genderFilter, ageGroupFilter, tagFilterIds, tagMatchAll]
   )
   const spaceTypeSummary = useMemo(
-    () => hasFilter ? getSpaceTypeSummaryFiltered(levelFilter, genderFilter, ageGroupFilter) : getSpaceTypeSummary(),
-    [hasFilter, levelFilter, genderFilter, ageGroupFilter]
+    () => hasFilter ? getSpaceTypeSummaryFiltered(levelFilter, genderFilter, ageGroupFilter, tagFilterIds, tagMatchAll) : getSpaceTypeSummary(),
+    [hasFilter, levelFilter, genderFilter, ageGroupFilter, tagFilterIds, tagMatchAll]
   )
   const hourlyUsageTrend = useMemo(
-    () => hasFilter ? getHourlyUsageTrendFiltered(selectedSpaceId, levelFilter, genderFilter, ageGroupFilter) : getHourlyUsageTrend(selectedSpaceId),
-    [hasFilter, selectedSpaceId, levelFilter, genderFilter, ageGroupFilter]
+    () => hasFilter ? getHourlyUsageTrendFiltered(selectedSpaceId, levelFilter, genderFilter, ageGroupFilter, tagFilterIds, tagMatchAll) : getHourlyUsageTrend(selectedSpaceId),
+    [hasFilter, selectedSpaceId, levelFilter, genderFilter, ageGroupFilter, tagFilterIds, tagMatchAll]
   )
 
   const selectedSpace = useMemo(() => spaces.find(s => s.id === selectedSpaceId) || spaces[0], [spaces, selectedSpaceId])

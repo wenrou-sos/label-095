@@ -7,12 +7,16 @@ interface FilterState {
   genders: string[]
   ageGroups: string[]
   categories: string[]
+  selectedTags: string[]
+  tagMatchAll: boolean
   searchKeyword: string
   setDateRange: (dateRange: DateRange) => void
   setMemberLevels: (levels: string[]) => void
   setGenders: (genders: string[]) => void
   setAgeGroups: (groups: string[]) => void
   setCategories: (categories: string[]) => void
+  setSelectedTags: (tags: string[]) => void
+  setTagMatchAll: (matchAll: boolean) => void
   setSearchKeyword: (keyword: string) => void
   resetFilters: () => void
 }
@@ -33,12 +37,16 @@ export const useFilterStore = create<FilterState>((set) => ({
   genders: [],
   ageGroups: [],
   categories: [],
+  selectedTags: [],
+  tagMatchAll: false,
   searchKeyword: '',
   setDateRange: (dateRange) => set({ dateRange }),
   setMemberLevels: (levels) => set({ memberLevels: levels }),
   setGenders: (genders) => set({ genders }),
   setAgeGroups: (groups) => set({ ageGroups: groups }),
   setCategories: (categories) => set({ categories }),
+  setSelectedTags: (tags) => set({ selectedTags: tags }),
+  setTagMatchAll: (matchAll) => set({ tagMatchAll: matchAll }),
   setSearchKeyword: (keyword) => set({ searchKeyword: keyword }),
   resetFilters: () =>
     set({
@@ -47,6 +55,8 @@ export const useFilterStore = create<FilterState>((set) => ({
       genders: [],
       ageGroups: [],
       categories: [],
+      selectedTags: [],
+      tagMatchAll: false,
       searchKeyword: '',
     }),
 }))

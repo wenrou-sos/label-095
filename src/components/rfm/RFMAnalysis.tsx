@@ -46,9 +46,11 @@ interface RFMAnalysisProps {
   levelFilter?: string
   genderFilter?: string
   ageGroupFilter?: string
+  tagFilterIds?: string[]
+  tagMatchAll?: boolean
 }
 
-export default function RFMAnalysis({ levelFilter, genderFilter, ageGroupFilter }: RFMAnalysisProps) {
+export default function RFMAnalysis({ levelFilter, genderFilter, ageGroupFilter, tagFilterIds = [], tagMatchAll = false }: RFMAnalysisProps) {
   const membersWithRFM = useMemo(() => {
     let data = getMembersWithRFM()
     if (levelFilter && levelFilter !== '全部') {
@@ -60,8 +62,16 @@ export default function RFMAnalysis({ levelFilter, genderFilter, ageGroupFilter 
     if (ageGroupFilter && ageGroupFilter !== '全部') {
       data = data.filter(m => m.ageGroup === ageGroupFilter)
     }
+    if (tagFilterIds.length > 0) {
+      data = data.filter(m => {
+        if (tagMatchAll) {
+          return tagFilterIds.every(tid => m.tags.includes(tid))
+        }
+        return tagFilterIds.some(tid => m.tags.includes(tid))
+      })
+    }
     return data
-  }, [levelFilter, genderFilter, ageGroupFilter])
+  }, [levelFilter, genderFilter, ageGroupFilter, tagFilterIds, tagMatchAll])
 
   const rfmSummary = useMemo(() => {
     const summary = getRFMSummary()
