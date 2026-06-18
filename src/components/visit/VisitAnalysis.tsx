@@ -69,9 +69,13 @@ export default function VisitAnalysis({ levelFilter, genderFilter, ageGroupFilte
   const levelVisitStats = useMemo(() => {
     const levels: MemberLevel[] = ['普通', '银卡', '金卡', '钻石']
     return levels.map(level => {
-      const levelMembers = members.filter(m => m.level === level)
-      const avgVisits = levelMembers.reduce((sum, m) => sum + m.visitCount, 0) / levelMembers.length / 12
-      const avgSpend = levelMembers.reduce((sum, m) => sum + m.totalSpend, 0) / levelMembers.length
+      const levelMembers = filteredMembers.filter(m => m.level === level)
+      const avgVisits = levelMembers.length > 0
+        ? levelMembers.reduce((sum, m) => sum + m.visitCount, 0) / levelMembers.length / 12
+        : 0
+      const avgSpend = levelMembers.length > 0
+        ? levelMembers.reduce((sum, m) => sum + m.totalSpend, 0) / levelMembers.length
+        : 0
       return {
         level,
         avgMonthlyVisits: parseFloat(avgVisits.toFixed(1)),
@@ -79,7 +83,7 @@ export default function VisitAnalysis({ levelFilter, genderFilter, ageGroupFilte
         memberCount: levelMembers.length,
       }
     })
-  }, [members])
+  }, [filteredMembers])
 
   const timeDistribution = useMemo(() => {
     const hours: Record<number, number> = {}

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Filter, RefreshCw, Search, User, Users, Calendar, ChevronDown, Tag, X, Check } from 'lucide-react'
+import { Filter, RefreshCw, User, Users, Calendar, ChevronDown, Tag, X, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Button from '@/components/ui/Button'
 import { useFilterStore } from '@/store/useFilterStore'
@@ -14,6 +14,7 @@ interface FilterBarProps {
   ageGroupFilter: string
   tagFilterIds: string[]
   tagMatchAll: boolean
+  refreshKey: number
   onLevelFilterChange: (value: string) => void
   onGenderFilterChange: (value: string) => void
   onAgeGroupFilterChange: (value: string) => void
@@ -28,6 +29,7 @@ export default function FilterBar({
   ageGroupFilter,
   tagFilterIds,
   tagMatchAll,
+  refreshKey,
   onLevelFilterChange,
   onGenderFilterChange,
   onAgeGroupFilterChange,
@@ -36,7 +38,9 @@ export default function FilterBar({
 }: FilterBarProps) {
   const { resetFilters } = useFilterStore()
   const [showTagDropdown, setShowTagDropdown] = useState(false)
-  const tags: MemberTag[] = useMemo(() => getAllTags(), [])
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const tags: MemberTag[] = useMemo(() => getAllTags(), [refreshKey])
 
   const hasActiveFilters = useMemo(() => {
     return levelFilter !== '全部' || genderFilter !== '全部' || ageGroupFilter !== '全部' || tagFilterIds.length > 0
@@ -53,8 +57,6 @@ export default function FilterBar({
   const clearTags = () => {
     onTagFilterChange([], tagMatchAll)
   }
-
-  const selectedTagNames = tags.filter(t => tagFilterIds.includes(t.id)).map(t => t.name).join('、') || '未选择'
 
   return (
     <motion.div

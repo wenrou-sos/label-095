@@ -297,6 +297,7 @@ export default function Home() {
             ageGroupFilter={ageGroupFilter}
             tagFilterIds={tagFilterIds}
             tagMatchAll={tagMatchAll}
+            refreshKey={refreshKey}
             onLevelFilterChange={setLevelFilter}
             onGenderFilterChange={setGenderFilter}
             onAgeGroupFilterChange={setAgeGroupFilter}

@@ -31,6 +31,11 @@ let membersCache: Member[] | null = null
 let consumptionRecordsCache: ConsumptionRecord[] | null = null
 let rfmScoresCache: RFMScore[] | null = null
 
+export function resetMembersCache() {
+  membersCache = null
+  rfmScoresCache = null
+}
+
 const segmentMap: Record<string, MemberSegment> = {
   champion: '高价值会员',
   loyal_customer: '高价值会员',
@@ -202,15 +207,6 @@ export function generateMembers(): Member[] {
   for (let i = 0; i < 500; i++) {
     const member = generateMember(`M${(i + 1).toString().padStart(4, '0')}`, shuffledLevels[i])
     members.push(member)
-  }
-
-  try {
-    const tagsModule = require('./tags') as typeof import('./tags')
-    members.forEach(member => {
-      member.tags = tagsModule.getMemberTags(member.id)
-    })
-  } catch {
-    // ignore if tags module not available yet
   }
 
   membersCache = members

@@ -24,12 +24,6 @@ export default function ConsumptionAnalysis({ levelFilter, genderFilter, ageGrou
   const [granularity, setGranularity] = useState<'month' | 'quarter'>('month')
   const [selectedDimension, setSelectedDimension] = useState<'level' | 'gender' | 'ageGroup'>('level')
 
-  const categoryBreakdown = useMemo(() => getCategoryBreakdown(), [])
-  const trendData = useMemo(() => getTrendData(granularity), [granularity])
-  const benchmarkData = useMemo(() => getBenchmarkData(), [])
-  const crossAnalysisData = useMemo(() => getCrossAnalysisDataByDimension(selectedDimension), [selectedDimension])
-  const timeSlotData = useMemo(() => getConsumptionByTimeSlot(), [])
-  const weekdayData = useMemo(() => getConsumptionByWeekday(), [])
   const members = useMemo(() => generateMembers(), [])
 
   const filteredMembers = useMemo(() => {
@@ -53,6 +47,15 @@ export default function ConsumptionAnalysis({ levelFilter, genderFilter, ageGrou
     }
     return data
   }, [members, levelFilter, genderFilter, ageGroupFilter, tagFilterIds, tagMatchAll])
+
+  const filteredMemberIds = useMemo(() => filteredMembers.map(m => m.id), [filteredMembers])
+
+  const categoryBreakdown = useMemo(() => getCategoryBreakdown(filteredMemberIds), [filteredMemberIds])
+  const trendData = useMemo(() => getTrendData(granularity, filteredMemberIds), [granularity, filteredMemberIds])
+  const benchmarkData = useMemo(() => getBenchmarkData(filteredMemberIds), [filteredMemberIds])
+  const crossAnalysisData = useMemo(() => getCrossAnalysisDataByDimension(selectedDimension, filteredMemberIds), [selectedDimension, filteredMemberIds])
+  const timeSlotData = useMemo(() => getConsumptionByTimeSlot(filteredMemberIds), [filteredMemberIds])
+  const weekdayData = useMemo(() => getConsumptionByWeekday(filteredMemberIds), [filteredMemberIds])
 
   const totalConsumption = useMemo(() => {
     return categoryBreakdown.reduce((sum, item) => sum + item.value, 0)

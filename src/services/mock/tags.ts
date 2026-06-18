@@ -1,6 +1,7 @@
 import dayjs from 'dayjs'
 import type { MemberTag } from '../../types/tag'
-import { generateMembers as baseGenerateMembers, generateConsumptionRecords } from './members'
+import type { ConsumptionRecord } from '../../types/consumption'
+import { generateMembers as baseGenerateMembers, generateConsumptionRecords, resetMembersCache } from './members'
 import type { Member } from '../../types/member'
 
 const defaultTags: MemberTag[] = [
@@ -78,6 +79,12 @@ const defaultTags: MemberTag[] = [
 
 let tags: MemberTag[] = [...defaultTags]
 let memberTagMap: Map<string, string[]> | null = null
+const customTagRules: Map<string, (member: Member, records: ConsumptionRecord[]) => boolean> = new Map()
+
+function resetMemberTagMap() {
+  memberTagMap = null
+  resetMembersCache()
+}
 
 function buildMemberTagMap(): Map<string, string[]> {
   if (memberTagMap) return memberTagMap
@@ -125,7 +132,14 @@ function buildMemberTagMap(): Map<string, string[]> {
       memberTags.push('T010')
     }
 
+    customTagRules.forEach((rule, tagId) => {
+      if (rule(member, memberRecords as ConsumptionRecord[])) {
+        memberTags.push(tagId)
+      }
+    })
+
     memberTagMap!.set(member.id, memberTags)
+    member.tags = memberTags
   })
 
   return memberTagMap
@@ -143,22 +157,40 @@ export function getAllTags(): MemberTag[] {
   }))
 }
 
-export function createTag(data: Omit<MemberTag, 'id' | 'createdAt'>): MemberTag {
-  const newId = `T${String(tags.length + 1).padStart(3, '0')}`
+export function createTag(data: Omit<MemberTag, 'id' | 'createdAt'>, rule?: (member: Member, records: ConsumptionRecord[]) => boolean): MemberTag {
+  const maxId = tags.reduce((max, t) => {
+    const num = parseInt(t.id.replace('T', ''), 10)
+    return num > max ? num : max
+  }, 0)
+  const newId = `T${String(maxId + 1).padStart(3, '0')}`
   const newTag: MemberTag = {
     ...data,
     id: newId,
     createdAt: dayjs().format('YYYY-MM-DD'),
   }
   tags = [...tags, newTag]
+
+  if (rule) {
+    customTagRules.set(newId, rule)
+  } else {
+    customTagRules.set(newId, () => Math.random() < 0.1)
+  }
+
+  resetMemberTagMap()
   return newTag
 }
 
-export function updateTag(id: string, data: Partial<Omit<MemberTag, 'id' | 'createdAt'>>): MemberTag | null {
+export function updateTag(id: string, data: Partial<Omit<MemberTag, 'id' | 'createdAt'>>, rule?: (member: Member, records: ConsumptionRecord[]) => boolean): MemberTag | null {
   const index = tags.findIndex(t => t.id === id)
   if (index === -1) return null
 
   tags = tags.map(t => t.id === id ? { ...t, ...data } : t)
+
+  if (rule) {
+    customTagRules.set(id, rule)
+  }
+
+  resetMemberTagMap()
   return tags.find(t => t.id === id) || null
 }
 
@@ -167,12 +199,9 @@ export function deleteTag(id: string): boolean {
   if (index === -1) return false
 
   tags = tags.filter(t => t.id !== id)
+  customTagRules.delete(id)
 
-  if (memberTagMap) {
-    memberTagMap.forEach((tagIds, memberId) => {
-      memberTagMap!.set(memberId, tagIds.filter(tid => tid !== id))
-    })
-  }
+  resetMemberTagMap()
   return true
 }
 

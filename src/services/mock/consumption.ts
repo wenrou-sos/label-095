@@ -28,8 +28,13 @@ function randomFloat(min: number, max: number, decimals: number = 2): number {
   return parseFloat((Math.random() * (max - min) + min).toFixed(decimals))
 }
 
-export function getCategoryBreakdown(): CategoryBreakdown[] {
-  const records = generateConsumptionRecords()
+export function getCategoryBreakdown(memberIds?: string[]): CategoryBreakdown[] {
+  let records = generateConsumptionRecords()
+  if (memberIds && memberIds.length > 0) {
+    const memberIdSet = new Set(memberIds)
+    records = records.filter(r => memberIdSet.has(r.memberId))
+  }
+
   const categoryTotals: Record<ConsumptionCategory, number> = {
     '餐饮': 0,
     '酒水': 0,
@@ -47,12 +52,16 @@ export function getCategoryBreakdown(): CategoryBreakdown[] {
   return categories.map(category => ({
     name: category,
     value: parseFloat(categoryTotals[category].toFixed(2)),
-    percentage: parseFloat(((categoryTotals[category] / total) * 100).toFixed(2))
+    percentage: total > 0 ? parseFloat(((categoryTotals[category] / total) * 100).toFixed(2)) : 0
   }))
 }
 
-export function getTrendData(granularity: Granularity = 'month'): TrendDataPoint[] {
-  const records = generateConsumptionRecords()
+export function getTrendData(granularity: Granularity = 'month', memberIds?: string[]): TrendDataPoint[] {
+  let records = generateConsumptionRecords()
+  if (memberIds && memberIds.length > 0) {
+    const memberIdSet = new Set(memberIds)
+    records = records.filter(r => memberIdSet.has(r.memberId))
+  }
   const endDate = dayjs()
   const startDate = endDate.subtract(granularity === 'quarter' ? 8 : 12, 'month')
 
@@ -190,8 +199,8 @@ export function getCrossAnalysisData(): CrossAnalysisData {
   }
 }
 
-export function getBenchmarkData(): BenchmarkData {
-  const clubBreakdown = getCategoryBreakdown()
+export function getBenchmarkData(memberIds?: string[]): BenchmarkData {
+  const clubBreakdown = getCategoryBreakdown(memberIds)
 
   const industryBase: Record<ConsumptionCategory, number> = {
     '餐饮': 32,
@@ -213,11 +222,15 @@ export function getBenchmarkData(): BenchmarkData {
   }
 }
 
-export function getConsumptionByTimeSlot(): {
+export function getConsumptionByTimeSlot(memberIds?: string[]): {
   slots: string[]
   data: Record<ConsumptionCategory, number[]>
 } {
-  const records = generateConsumptionRecords()
+  let records = generateConsumptionRecords()
+  if (memberIds && memberIds.length > 0) {
+    const memberIdSet = new Set(memberIds)
+    records = records.filter(r => memberIdSet.has(r.memberId))
+  }
   const slots = ['早餐(06-10)', '午餐(10-14)', '下午茶(14-17)', '晚餐(17-21)', '夜宵(21-24)']
 
   const slotData: Record<ConsumptionCategory, number[]> = {
@@ -251,11 +264,15 @@ export function getConsumptionByTimeSlot(): {
   }
 }
 
-export function getConsumptionByWeekday(): {
+export function getConsumptionByWeekday(memberIds?: string[]): {
   weekdays: string[]
   data: Record<ConsumptionCategory, number[]>
 } {
-  const records = generateConsumptionRecords()
+  let records = generateConsumptionRecords()
+  if (memberIds && memberIds.length > 0) {
+    const memberIdSet = new Set(memberIds)
+    records = records.filter(r => memberIdSet.has(r.memberId))
+  }
   const weekdays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
   const weekdayMap: Record<string, number> = {
     '星期一': 0, '星期二': 1, '星期三': 2, '星期四': 3, '星期五': 4, '星期六': 5, '星期日': 6
@@ -312,13 +329,20 @@ export function getPaymentMethodStats(): {
 export { categoryColors }
 
 export function getCrossAnalysisDataByDimension(
-  dimension: 'level' | 'gender' | 'ageGroup'
+  dimension: 'level' | 'gender' | 'ageGroup',
+  memberIds?: string[]
 ): CrossAnalysisData & {
   dimension: 'level' | 'gender' | 'ageGroup'
   groups: string[]
 } {
-  const members = generateMembers()
-  const records = generateConsumptionRecords()
+  let members = generateMembers()
+  let records = generateConsumptionRecords()
+
+  if (memberIds && memberIds.length > 0) {
+    const memberIdSet = new Set(memberIds)
+    members = members.filter(m => memberIdSet.has(m.id))
+    records = records.filter(r => memberIdSet.has(r.memberId))
+  }
 
   const getMemberGroups = (): string[] => {
     switch (dimension) {
