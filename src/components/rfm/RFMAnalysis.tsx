@@ -63,7 +63,30 @@ export default function RFMAnalysis({ levelFilter, genderFilter, ageGroupFilter 
     return data
   }, [levelFilter, genderFilter, ageGroupFilter])
 
-  const rfmSummary = useMemo(() => getRFMSummary(), [])
+  const rfmSummary = useMemo(() => {
+    const summary = getRFMSummary()
+    if (membersWithRFM.length === getMembersWithRFM().length) {
+      return summary
+    }
+
+    const segmentDistribution: Record<string, number> = {}
+    let totalScore = 0
+    membersWithRFM.forEach(m => {
+      segmentDistribution[m.rfm.segment] = (segmentDistribution[m.rfm.segment] || 0) + 1
+      totalScore += m.rfm.totalScore
+    })
+
+    const allSegments = ['高价值会员', '潜力会员', '重要深耕', '重要唤回', '一般会员', '沉睡会员', '流失会员', '新会员']
+    allSegments.forEach(seg => {
+      if (!segmentDistribution[seg]) segmentDistribution[seg] = 0
+    })
+
+    return {
+      totalMembers: membersWithRFM.length,
+      avgScore: membersWithRFM.length > 0 ? parseFloat((totalScore / membersWithRFM.length).toFixed(1)) : 0,
+      segmentDistribution,
+    }
+  }, [membersWithRFM])
 
   const highRiskMembers = useMemo(() => {
     return membersWithRFM

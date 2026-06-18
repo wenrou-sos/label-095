@@ -1,8 +1,9 @@
 import dayjs from 'dayjs'
 import type { ConsumptionCategory, CategoryBreakdown, TrendDataPoint, BenchmarkData, ConsumptionRecord } from '../../types/consumption'
-import { generateConsumptionRecords } from './members'
+import { generateConsumptionRecords, generateMembers } from './members'
+import type { MemberLevel, Gender, AgeGroup } from '../../types/member'
 
-export type Granularity = 'day' | 'week' | 'month'
+export type Granularity = 'day' | 'week' | 'month' | 'quarter'
 
 const categories: ConsumptionCategory[] = ['餐饮', '酒水', 'SPA', '棋牌', '客房']
 const categoryColors: Record<ConsumptionCategory, string> = {
@@ -53,15 +54,33 @@ export function getCategoryBreakdown(): CategoryBreakdown[] {
 export function getTrendData(granularity: Granularity = 'month'): TrendDataPoint[] {
   const records = generateConsumptionRecords()
   const endDate = dayjs()
-  const startDate = endDate.subtract(12, 'month')
+  const startDate = endDate.subtract(granularity === 'quarter' ? 8 : 12, 'month')
 
   const dataMap = new Map<string, Record<ConsumptionCategory, number>>()
 
-  let current = startDate.startOf(granularity === 'day' ? 'day' : granularity === 'week' ? 'week' : 'month')
-  const end = endDate.endOf(granularity === 'day' ? 'day' : granularity === 'week' ? 'week' : 'month')
+  const getPeriodUnit = () => {
+    if (granularity === 'day') return 'day' as const
+    if (granularity === 'week') return 'week' as const
+    if (granularity === 'quarter') return 'month' as const
+    return 'month' as const
+  }
 
-  while (current.isBefore(end) || current.isSame(end, granularity === 'day' ? 'day' : granularity === 'week' ? 'week' : 'month')) {
-    const key = current.format(granularity === 'day' ? 'YYYY-MM-DD' : granularity === 'week' ? 'YYYY-MM-DD' : 'YYYY-MM')
+  let current = startDate.startOf(getPeriodUnit())
+  const end = endDate.endOf(getPeriodUnit())
+
+  const formatKey = (date: dayjs.Dayjs) => {
+    if (granularity === 'quarter') {
+      const year = date.year()
+      const quarter = Math.ceil(date.month() / 3)
+      return `${year}Q${quarter}`
+    }
+    if (granularity === 'day') return date.format('YYYY-MM-DD')
+    if (granularity === 'week') return date.startOf('week').format('YYYY-MM-DD')
+    return date.format('YYYY-MM')
+  }
+
+  while (current.isBefore(end) || current.isSame(end, getPeriodUnit())) {
+    const key = formatKey(current)
     dataMap.set(key, {
       '餐饮': 0,
       '酒水': 0,
@@ -69,23 +88,34 @@ export function getTrendData(granularity: Granularity = 'month'): TrendDataPoint
       '棋牌': 0,
       '客房': 0
     })
-    current = current.add(1, granularity === 'day' ? 'day' : granularity === 'week' ? 'week' : 'month')
+    current = current.add(1, getPeriodUnit())
   }
 
   records.forEach(record => {
     const recordDate = dayjs(record.date)
     if (recordDate.isBefore(startDate) || recordDate.isAfter(endDate)) return
 
-    const periodKey = recordDate.format(granularity === 'day' ? 'YYYY-MM-DD' : granularity === 'week' ? 'YYYY-MM-DD' : 'YYYY-MM')
-    const weekStart = recordDate.startOf('week').format('YYYY-MM-DD')
-    const key = granularity === 'week' ? weekStart : periodKey
+    const key = formatKey(recordDate)
 
     if (dataMap.has(key)) {
       dataMap.get(key)![record.category] += record.amount
     }
   })
 
-  return Array.from(dataMap.entries()).map(([date, categories]) => ({
+  const quarterlyAggregated = new Map<string, Record<ConsumptionCategory, number>>()
+  if (granularity === 'quarter') {
+    dataMap.forEach((value, key) => {
+      if (!quarterlyAggregated.has(key)) {
+        quarterlyAggregated.set(key, { '餐饮': 0, '酒水': 0, 'SPA': 0, '棋牌': 0, '客房': 0 })
+      }
+      const agg = quarterlyAggregated.get(key)!
+      categories.forEach(cat => { agg[cat] += value[cat] })
+    })
+  }
+
+  const finalMap = granularity === 'quarter' ? quarterlyAggregated : dataMap
+
+  return Array.from(finalMap.entries()).map(([date, categories]) => ({
     date,
     categories: {
       '餐饮': parseFloat(categories['餐饮'].toFixed(2)),
@@ -280,3 +310,84 @@ export function getPaymentMethodStats(): {
 }
 
 export { categoryColors }
+
+export function getCrossAnalysisDataByDimension(
+  dimension: 'level' | 'gender' | 'ageGroup'
+): CrossAnalysisData & {
+  dimension: 'level' | 'gender' | 'ageGroup'
+  groups: string[]
+} {
+  const members = generateMembers()
+  const records = generateConsumptionRecords()
+
+  const getMemberGroups = (): string[] => {
+    switch (dimension) {
+      case 'level':
+        return ['钻石', '金卡', '银卡', '普通']
+      case 'gender':
+        return ['男', '女']
+      case 'ageGroup':
+        return ['18-25', '26-35', '36-45', '46-55', '55+']
+      default:
+        return []
+    }
+  }
+
+  const groups = getMemberGroups()
+
+  const getMemberDimensionValue = (memberId: string): string | undefined => {
+    const member = members.find(m => m.id === memberId)
+    if (!member) return undefined
+    switch (dimension) {
+      case 'level':
+        return member.level
+      case 'gender':
+        return member.gender
+      case 'ageGroup':
+        return member.ageGroup
+      default:
+        return undefined
+    }
+  }
+
+  const groupCategoryAmount: Record<string, Record<ConsumptionCategory, number>> = {}
+  const groupCategoryCount: Record<string, Record<ConsumptionCategory, number>> = {}
+
+  groups.forEach(group => {
+    groupCategoryAmount[group] = { '餐饮': 0, '酒水': 0, 'SPA': 0, '棋牌': 0, '客房': 0 }
+    groupCategoryCount[group] = { '餐饮': 0, '酒水': 0, 'SPA': 0, '棋牌': 0, '客房': 0 }
+  })
+
+  records.forEach(record => {
+    const group = getMemberDimensionValue(record.memberId)
+    if (!group || !groups.includes(group)) return
+
+    groupCategoryAmount[group][record.category] += record.amount
+    groupCategoryCount[group][record.category]++
+  })
+
+  const groupTotals = groups.map(group => {
+    const total = categories.reduce((sum, cat) => sum + groupCategoryAmount[group][cat], 0)
+    return { group, total }
+  })
+
+  const maxTotal = Math.max(...groupTotals.map(g => g.total), 1)
+
+  const matrix: number[][] = groups.map((group, i) =>
+    categories.map((cat, j) => {
+      const amount = groupCategoryAmount[group][cat]
+      const percentage = groupTotals[i].total > 0
+        ? parseFloat(((amount / groupTotals[i].total * 100).toFixed(1)))
+        : 0
+      return percentage
+    })
+  )
+
+  return {
+    dimension,
+    groups,
+    categories,
+    matrix,
+    correlation: {},
+  }
+}

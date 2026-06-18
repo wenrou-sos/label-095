@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import ReactECharts from 'echarts-for-react'
 import { motion } from 'framer-motion'
 import { Wine, Calendar, TrendingUp, BarChart3, MousePointerClick, ShoppingCart, Star, Users, ArrowRight, Sparkles } from 'lucide-react'
@@ -22,7 +22,6 @@ export default function RecommendAnalysis({ levelFilter, genderFilter, ageGroupF
   const [activeTab, setActiveTab] = useState<'wine' | 'activity'>('wine')
 
   const members = useMemo(() => generateMembers(), [])
-  const recommendationSummary = useMemo(() => getRecommendationSummary(), [])
   const recommendationEffect = useMemo(() => getRecommendationEffect(), [])
   const wineRecommendations = useMemo(() => getWineRecommendations(selectedMemberId), [selectedMemberId])
   const activityRecommendations = useMemo(() => getActivityRecommendations(selectedMemberId), [selectedMemberId])
@@ -43,7 +42,27 @@ export default function RecommendAnalysis({ levelFilter, genderFilter, ageGroupF
     return data
   }, [members, levelFilter, genderFilter, ageGroupFilter])
 
-  const selectedMember = useMemo(() => members.find(m => m.id === selectedMemberId) || members[0], [members, selectedMemberId])
+  const selectedMember = useMemo(() => {
+    return filteredMembers.find(m => m.id === selectedMemberId) || filteredMembers[0] || null
+  }, [filteredMembers, selectedMemberId])
+
+  useEffect(() => {
+    if (filteredMembers.length > 0 && selectedMember && !filteredMembers.find(m => m.id === selectedMemberId)) {
+      setSelectedMemberId(filteredMembers[0].id)
+    }
+  }, [filteredMembers, selectedMember, selectedMemberId])
+
+  const recommendationSummary = useMemo(() => {
+    const summary = getRecommendationSummary()
+    if (filteredMembers.length === members.length) return summary
+
+    const ratio = filteredMembers.length / members.length
+    return {
+      ...summary,
+      totalWineRecommended: Math.round(summary.totalWineRecommended * ratio),
+      totalActivityRecommended: Math.round(summary.totalActivityRecommended * ratio),
+    }
+  }, [filteredMembers, members.length])
 
   const effectTrendOption = useMemo((): EChartsOption => {
     const dates = recommendationEffect.map(e => e.date.substring(5))

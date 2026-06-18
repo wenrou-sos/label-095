@@ -6,7 +6,7 @@ import type { EChartsOption } from 'echarts'
 import Card from '@/components/ui/Card'
 import MetricCard from '@/components/ui/MetricCard'
 import Table from '@/components/ui/Table'
-import { getCategoryBreakdown, getTrendData, getBenchmarkData, getCrossAnalysisData, getConsumptionByTimeSlot, getConsumptionByWeekday, categoryColors } from '@/services/mock/consumption'
+import { getCategoryBreakdown, getTrendData, getBenchmarkData, getCrossAnalysisData, getConsumptionByTimeSlot, getConsumptionByWeekday, getCrossAnalysisDataByDimension, categoryColors } from '@/services/mock/consumption'
 import { generateMembers } from '@/services/mock/members'
 import { chartTheme, commonChartOption } from '@/utils/chartTheme'
 import { cn } from '@/lib/utils'
@@ -23,9 +23,9 @@ export default function ConsumptionAnalysis({ levelFilter, genderFilter, ageGrou
   const [selectedDimension, setSelectedDimension] = useState<'level' | 'gender' | 'ageGroup'>('level')
 
   const categoryBreakdown = useMemo(() => getCategoryBreakdown(), [])
-  const trendData = useMemo(() => getTrendData(granularity === 'quarter' ? 'month' : 'month'), [granularity])
+  const trendData = useMemo(() => getTrendData(granularity), [granularity])
   const benchmarkData = useMemo(() => getBenchmarkData(), [])
-  const crossAnalysisData = useMemo(() => getCrossAnalysisData(), [])
+  const crossAnalysisData = useMemo(() => getCrossAnalysisDataByDimension(selectedDimension), [selectedDimension])
   const timeSlotData = useMemo(() => getConsumptionByTimeSlot(), [])
   const weekdayData = useMemo(() => getConsumptionByWeekday(), [])
   const members = useMemo(() => generateMembers(), [])
@@ -243,12 +243,35 @@ export default function ConsumptionAnalysis({ levelFilter, genderFilter, ageGrou
   }, [benchmarkData])
 
   const crossAnalysisOption = useMemo((): EChartsOption => {
-    const { categories, matrix } = crossAnalysisData
+    const data = crossAnalysisData as {
+      categories: string[]
+      matrix: number[][]
+      dimension?: 'level' | 'gender' | 'ageGroup'
+      groups?: string[]
+    }
+
+    const hasDimension = !!data.dimension && !!data.groups
+    const yAxisData = hasDimension ? data.groups! : data.categories
+    const xAxisData = data.categories
+
+    const dimensionLabels: Record<string, string> = {
+      level: '会员等级',
+      gender: '性别',
+      ageGroup: '年龄段',
+    }
+
+    const titleText = hasDimension
+      ? `消费结构交叉分析（${dimensionLabels[data.dimension!]}）`
+      : '消费类目交叉分析热力图'
+    const subText = hasDimension
+      ? '展示不同群体在各消费类目的金额占比'
+      : '展示会员同时消费多个类目的概率'
+
     return {
       ...commonChartOption(),
       title: {
-        text: '消费类目交叉分析热力图',
-        subtext: '展示会员同时消费多个类目的概率',
+        text: titleText,
+        subtext: subText,
         left: 'center',
         textStyle: { fontSize: 14, fontWeight: 600 },
         subtextStyle: { fontSize: 11 },
@@ -257,7 +280,10 @@ export default function ConsumptionAnalysis({ levelFilter, genderFilter, ageGrou
         position: 'top',
         formatter: (params: any) => {
           const [x, y, value] = params.value
-          return `${categories[y]} → ${categories[x]}<br/>共同消费率: ${value}%`
+          if (hasDimension) {
+            return `${data.groups![y]} → ${xAxisData[x]}<br/>消费占比: ${value}%`
+          }
+          return `${data.categories[y]} → ${xAxisData[x]}<br/>共同消费率: ${value}%`
         },
       },
       grid: {
@@ -268,12 +294,12 @@ export default function ConsumptionAnalysis({ levelFilter, genderFilter, ageGrou
       },
       xAxis: {
         type: 'category',
-        data: categories,
+        data: xAxisData,
         splitArea: { show: true },
       },
       yAxis: {
         type: 'category',
-        data: categories,
+        data: yAxisData,
         splitArea: { show: true },
       },
       visualMap: {
@@ -290,9 +316,9 @@ export default function ConsumptionAnalysis({ levelFilter, genderFilter, ageGrou
       },
       series: [
         {
-          name: '共同消费率',
+          name: hasDimension ? '消费占比' : '共同消费率',
           type: 'heatmap',
-          data: matrix.map((row, i) =>
+          data: data.matrix.map((row, i) =>
             row.map((value, j) => [j, i, value])
           ).flat(),
           label: {

@@ -13,6 +13,7 @@ import { generateMembers, generateConsumptionRecords, generateRFMScores } from '
 import { getCategoryBreakdown, getTrendData } from '@/services/mock/consumption'
 import { getSpaceList, getSpaceTypeSummary } from '@/services/mock/space'
 import { getRecommendationEffect } from '@/services/mock/recommend'
+import type { ConsumptionRecord } from '@/types/consumption'
 
 type ExportFormat = 'excel' | 'pdf' | 'csv'
 type ExportType = 'members' | 'consumption' | 'rfm' | 'space' | 'recommendation' | 'all'
@@ -96,8 +97,15 @@ export default function DataExport() {
       const val = item[dateField]
       if (typeof val !== 'string') return true
       const d = dayjs(val)
-      return d.isAfter(start) && d.isBefore(end)
+      return (d.isSame(start, 'day') || d.isAfter(start)) && (d.isSame(end, 'day') || d.isBefore(end))
     })
+  }
+
+  const getFilteredMemberIdsForExport = (): Set<string> | null => {
+    const allRecords = generateConsumptionRecords()
+    const records = filterByDateRange(allRecords as unknown as Record<string, unknown>[], 'date')
+    if (records.length === allRecords.length) return null
+    return new Set(records.map(r => (r as unknown as ConsumptionRecord).memberId))
   }
 
   const generateExcelData = async (type: ExportType) => {
@@ -139,21 +147,22 @@ export default function DataExport() {
         return records
       }
       case 'rfm': {
-        const scores = filterByDateRange(
-          generateRFMScores().map(s => ({
-            会员ID: s.memberId,
-            最近消费天数: s.lastConsumeDays,
-            消费频率: s.consumeFrequency,
-            消费金额: s.consumeAmount,
-            R评分: s.recency,
-            F评分: s.frequency,
-            M评分: s.monetary,
-            RFM总分: s.totalScore,
-            会员群体: s.segment,
-            风险等级: s.riskLevel,
-          })),
-          '会员ID'
-        )
+        const filteredMemberIds = getFilteredMemberIdsForExport()
+        let scores = generateRFMScores().map(s => ({
+          会员ID: s.memberId,
+          最近消费天数: s.lastConsumeDays,
+          消费频率: s.consumeFrequency,
+          消费金额: s.consumeAmount,
+          R评分: s.recency,
+          F评分: s.frequency,
+          M评分: s.monetary,
+          RFM总分: s.totalScore,
+          会员群体: s.segment,
+          风险等级: s.riskLevel,
+        }))
+        if (filteredMemberIds) {
+          scores = scores.filter(s => filteredMemberIds.has(s.会员ID as string))
+        }
         return scores
       }
       case 'space':
