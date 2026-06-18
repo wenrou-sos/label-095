@@ -373,7 +373,19 @@ export function getRecommendationSummary(): {
   overallConversionRate: number
 } {
   const members = generateMembers()
-  const sampleMembers = members.slice(0, 100)
+  return getRecommendationSummaryFiltered(members.map(m => m.id))
+}
+
+export function getRecommendationSummaryFiltered(memberIds: string[]): {
+  totalWineRecommended: number
+  totalActivityRecommended: number
+  avgMatchScore: number
+  totalClicks: number
+  totalConversions: number
+  overallCTR: number
+  overallConversionRate: number
+} {
+  const sampleMembers = memberIds.length > 100 ? memberIds.slice(0, 100) : memberIds
 
   let totalMatchScore = 0
   let totalClicks = 0
@@ -382,9 +394,9 @@ export function getRecommendationSummary(): {
   let wineCount = 0
   let activityCount = 0
 
-  sampleMembers.forEach(member => {
-    const wineRecs = getWineRecommendations(member.id)
-    const activityRecs = getActivityRecommendations(member.id)
+  sampleMembers.forEach(memberId => {
+    const wineRecs = getWineRecommendations(memberId)
+    const activityRecs = getActivityRecommendations(memberId)
 
     wineCount += wineRecs.length
     activityCount += activityRecs.length
@@ -402,10 +414,32 @@ export function getRecommendationSummary(): {
   return {
     totalWineRecommended: wineCount,
     totalActivityRecommended: activityCount,
-    avgMatchScore: parseFloat((totalMatchScore / totalRecs).toFixed(2)),
+    avgMatchScore: totalRecs > 0 ? parseFloat((totalMatchScore / totalRecs).toFixed(2)) : 0,
     totalClicks,
     totalConversions,
-    overallCTR: parseFloat(((totalClicks / totalImpressions) * 100).toFixed(2)),
-    overallConversionRate: parseFloat(((totalConversions / totalClicks) * 100).toFixed(2))
+    overallCTR: totalImpressions > 0 ? parseFloat(((totalClicks / totalImpressions) * 100).toFixed(2)) : 0,
+    overallConversionRate: totalClicks > 0 ? parseFloat(((totalConversions / totalClicks) * 100).toFixed(2)) : 0,
   }
+}
+
+export function getRecommendationEffectFiltered(memberIds: string[]): RecommendationEffect[] {
+  const allEffects = getRecommendationEffect()
+  const ratio = memberIds.length / generateMembers().length
+
+  return allEffects.map(e => {
+    const impressions = Math.max(1, Math.round(e.impressions * ratio))
+    const clicks = Math.max(0, Math.round(e.clicks * ratio))
+    const conversions = Math.max(0, Math.round(e.conversions * ratio))
+    const ctr = impressions > 0 ? parseFloat(((clicks / impressions) * 100).toFixed(2)) : 0
+    const conversionRate = clicks > 0 ? parseFloat(((conversions / clicks) * 100).toFixed(2)) : 0
+
+    return {
+      date: e.date,
+      impressions,
+      clicks,
+      conversions,
+      ctr,
+      conversionRate,
+    }
+  })
 }

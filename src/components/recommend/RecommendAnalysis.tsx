@@ -6,7 +6,7 @@ import type { EChartsOption } from 'echarts'
 import Card from '@/components/ui/Card'
 import MetricCard from '@/components/ui/MetricCard'
 import Table from '@/components/ui/Table'
-import { getWineRecommendations, getActivityRecommendations, getRecommendationEffect, getRecommendationSummary, getWineList, getActivityList } from '@/services/mock/recommend'
+import { getWineRecommendations, getActivityRecommendations, getRecommendationEffect, getRecommendationSummary, getRecommendationSummaryFiltered, getRecommendationEffectFiltered, getWineList, getActivityList } from '@/services/mock/recommend'
 import { generateMembers } from '@/services/mock/members'
 import { chartTheme, commonChartOption } from '@/utils/chartTheme'
 import { cn } from '@/lib/utils'
@@ -22,9 +22,6 @@ export default function RecommendAnalysis({ levelFilter, genderFilter, ageGroupF
   const [activeTab, setActiveTab] = useState<'wine' | 'activity'>('wine')
 
   const members = useMemo(() => generateMembers(), [])
-  const recommendationEffect = useMemo(() => getRecommendationEffect(), [])
-  const wineRecommendations = useMemo(() => getWineRecommendations(selectedMemberId), [selectedMemberId])
-  const activityRecommendations = useMemo(() => getActivityRecommendations(selectedMemberId), [selectedMemberId])
   const wineList = useMemo(() => getWineList(), [])
   const activityList = useMemo(() => getActivityList(), [])
 
@@ -42,27 +39,38 @@ export default function RecommendAnalysis({ levelFilter, genderFilter, ageGroupF
     return data
   }, [members, levelFilter, genderFilter, ageGroupFilter])
 
-  const selectedMember = useMemo(() => {
-    return filteredMembers.find(m => m.id === selectedMemberId) || filteredMembers[0] || null
+  const filteredMemberIds = useMemo(() => filteredMembers.map(m => m.id), [filteredMembers])
+
+  const isFiltered = filteredMembers.length !== members.length
+
+  const effectiveMemberId = useMemo(() => {
+    if (filteredMembers.length === 0) return ''
+    if (filteredMembers.find(m => m.id === selectedMemberId)) return selectedMemberId
+    return filteredMembers[0].id
   }, [filteredMembers, selectedMemberId])
 
   useEffect(() => {
-    if (filteredMembers.length > 0 && selectedMember && !filteredMembers.find(m => m.id === selectedMemberId)) {
-      setSelectedMemberId(filteredMembers[0].id)
+    if (effectiveMemberId !== selectedMemberId) {
+      setSelectedMemberId(effectiveMemberId)
     }
-  }, [filteredMembers, selectedMember, selectedMemberId])
+  }, [effectiveMemberId, selectedMemberId])
+
+  const selectedMember = useMemo(() => {
+    return filteredMembers.find(m => m.id === effectiveMemberId) || filteredMembers[0] || null
+  }, [filteredMembers, effectiveMemberId])
 
   const recommendationSummary = useMemo(() => {
-    const summary = getRecommendationSummary()
-    if (filteredMembers.length === members.length) return summary
+    if (!isFiltered) return getRecommendationSummary()
+    return getRecommendationSummaryFiltered(filteredMemberIds)
+  }, [isFiltered, filteredMemberIds])
 
-    const ratio = filteredMembers.length / members.length
-    return {
-      ...summary,
-      totalWineRecommended: Math.round(summary.totalWineRecommended * ratio),
-      totalActivityRecommended: Math.round(summary.totalActivityRecommended * ratio),
-    }
-  }, [filteredMembers, members.length])
+  const recommendationEffect = useMemo(() => {
+    if (!isFiltered) return getRecommendationEffect()
+    return getRecommendationEffectFiltered(filteredMemberIds)
+  }, [isFiltered, filteredMemberIds])
+
+  const wineRecommendations = useMemo(() => getWineRecommendations(effectiveMemberId), [effectiveMemberId])
+  const activityRecommendations = useMemo(() => getActivityRecommendations(effectiveMemberId), [effectiveMemberId])
 
   const effectTrendOption = useMemo((): EChartsOption => {
     const dates = recommendationEffect.map(e => e.date.substring(5))
