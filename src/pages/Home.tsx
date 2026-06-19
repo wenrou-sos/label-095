@@ -1,7 +1,7 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { BarChart3, Users, ShoppingBag, MapPin, Sparkles, Crown, Clock, LayoutGrid, Wine, Calendar, Tag } from 'lucide-react'
+import { BarChart3, Users, ShoppingBag, MapPin, Sparkles, Crown, Clock, LayoutGrid, Wine, Calendar, Tag, Bell } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Card from '@/components/ui/Card'
 import MetricCard from '@/components/ui/MetricCard'
@@ -13,13 +13,14 @@ import ConsumptionAnalysis from '@/components/consumption/ConsumptionAnalysis'
 import VisitAnalysis from '@/components/visit/VisitAnalysis'
 import SpaceAnalysis from '@/components/space/SpaceAnalysis'
 import RecommendAnalysis from '@/components/recommend/RecommendAnalysis'
-import { generateMembers, generateConsumptionRecords, getRFMSummary } from '@/services/mock/members'
+import AlertManagement from './AlertManagement'
+import { generateMembers, getRFMSummary } from '@/services/mock/members'
 import { getCategoryBreakdown } from '@/services/mock/consumption'
 import { getSpaceTypeSummary } from '@/services/mock/space'
 import { getRecommendationSummary } from '@/services/mock/recommend'
-import { useMemo } from 'react'
+import { getUnreadAlertCount, runAlertCheck } from '@/services/mock/alerts'
 
-type TabType = 'overview' | 'rfm' | 'consumption' | 'visit' | 'space' | 'recommend'
+type TabType = 'overview' | 'rfm' | 'consumption' | 'visit' | 'space' | 'recommend' | 'alerts'
 
 const tabs = [
   { key: 'overview' as TabType, label: '数据概览', icon: LayoutGrid, color: 'from-amber-500 to-orange-500' },
@@ -28,6 +29,7 @@ const tabs = [
   { key: 'visit' as TabType, label: '到店行为', icon: Clock, color: 'from-blue-500 to-cyan-500' },
   { key: 'space' as TabType, label: '场地利用', icon: MapPin, color: 'from-green-500 to-emerald-500' },
   { key: 'recommend' as TabType, label: '智能推荐', icon: Sparkles, color: 'from-purple-500 to-violet-500' },
+  { key: 'alerts' as TabType, label: '预警管理', icon: Bell, color: 'from-rose-500 to-red-500' },
 ]
 
 export default function Home() {
@@ -39,16 +41,34 @@ export default function Home() {
   const [tagFilterIds, setTagFilterIds] = useState<string[]>([])
   const [tagMatchAll, setTagMatchAll] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [unreadAlertCount, setUnreadAlertCount] = useState(0)
+
+  const refreshAlertCount = useCallback(() => {
+    setUnreadAlertCount(getUnreadAlertCount())
+  }, [])
+
+  useEffect(() => {
+    runAlertCheck()
+    refreshAlertCount()
+    const timer = setInterval(() => {
+      runAlertCheck()
+      refreshAlertCount()
+    }, 60000)
+    return () => clearInterval(timer)
+  }, [refreshAlertCount])
 
   const handleRefresh = useCallback(() => {
     setRefreshKey(prev => prev + 1)
-  }, [])
+    runAlertCheck()
+    refreshAlertCount()
+  }, [refreshAlertCount])
 
   const handleTagFilterChange = (ids: string[], matchAll: boolean) => {
     setTagFilterIds(ids)
     setTagMatchAll(matchAll)
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const overviewMetrics = useMemo(() => {
     const members = generateMembers()
     const consumption = getCategoryBreakdown()
@@ -135,7 +155,7 @@ export default function Home() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {tabs.filter(t => t.key !== 'overview').map((tab, index) => (
+        {tabs.filter(t => t.key !== 'overview').map((tab) => (
           <motion.div
             key={tab.key}
             whileHover={{ scale: 1.02, y: -4 }}
@@ -244,6 +264,8 @@ export default function Home() {
         return <SpaceAnalysis key={`space-${refreshKey}`} levelFilter={levelFilter} genderFilter={genderFilter} ageGroupFilter={ageGroupFilter} tagFilterIds={tagFilterIds} tagMatchAll={tagMatchAll} />
       case 'recommend':
         return <RecommendAnalysis key={`recommend-${refreshKey}`} levelFilter={levelFilter} genderFilter={genderFilter} ageGroupFilter={ageGroupFilter} tagFilterIds={tagFilterIds} tagMatchAll={tagMatchAll} />
+      case 'alerts':
+        return <AlertManagement key={`alerts-${refreshKey}`} onUnreadChange={setUnreadAlertCount} />
       default:
         return renderOverview()
     }
@@ -258,6 +280,27 @@ export default function Home() {
             <p className="mt-1 text-gray-500">全面洞察会员消费行为，助力精细化运营决策</p>
           </div>
           <div className="flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setActiveTab('alerts')
+                refreshAlertCount()
+              }}
+              className="relative"
+            >
+              <Bell className={cn('w-4 h-4', unreadAlertCount > 0 ? 'text-red-500' : '')} />
+              <span className="hidden md:inline ml-1.5">预警</span>
+              {unreadAlertCount > 0 && (
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center shadow-md"
+                >
+                  {unreadAlertCount > 99 ? '99+' : unreadAlertCount}
+                </motion.span>
+              )}
+            </Button>
             <Button
               variant="outline"
               size="sm"
