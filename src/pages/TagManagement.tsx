@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Tag, Plus, Edit2, Trash2, X, Users, Palette, Check, UserPlus, Search } from 'lucide-react'
+import { Tag, Plus, Edit2, Trash2, X, Users, Palette, Check, UserPlus, Search, Eye } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Card from '@/components/ui/Card'
 import Table from '@/components/ui/Table'
@@ -9,6 +9,7 @@ import { generateMembers } from '@/services/mock/members'
 import type { MemberTag } from '@/types/tag'
 import type { Member } from '@/types/member'
 import { cn } from '@/lib/utils'
+import MemberDetailPanel from '@/components/member/MemberDetailPanel'
 
 const presetColors = [
   '#EF4444', '#F97316', '#F59E0B', '#84CC16', '#22C55E',
@@ -25,6 +26,7 @@ interface TagFormData {
 }
 
 export default function TagManagement() {
+  const [selectedMemberDetailId, setSelectedMemberDetailId] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
   const [showDialog, setShowDialog] = useState(false)
   const [editingTag, setEditingTag] = useState<MemberTag | null>(null)
@@ -735,6 +737,16 @@ export default function TagManagement() {
                             <span className="truncate">{member.phone}</span>
                           </div>
                         </div>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedMemberDetailId(member.id)
+                          }}
+                          className="p-1.5 rounded-lg text-indigo-500 bg-indigo-50 hover:bg-indigo-100 transition-colors flex-shrink-0"
+                          title="查看会员详情"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
                       </div>
                     )
                   })
@@ -758,6 +770,11 @@ export default function TagManagement() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <MemberDetailPanel
+        memberId={selectedMemberDetailId}
+        onClose={() => setSelectedMemberDetailId(null)}
+      />
     </div>
   )
 }

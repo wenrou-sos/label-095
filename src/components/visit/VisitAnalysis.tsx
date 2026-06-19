@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import { motion } from 'framer-motion'
 import { Calendar, Clock, Users, TrendingUp, BarChart3, PieChart, Activity } from 'lucide-react'
@@ -9,7 +9,9 @@ import Table from '@/components/ui/Table'
 import { generateMembers, generateConsumptionRecords } from '@/services/mock/members'
 import { chartTheme, commonChartOption } from '@/utils/chartTheme'
 import { cn } from '@/lib/utils'
-import type { MemberLevel } from '@/types/member'
+import type { MemberLevel, Member } from '@/types/member'
+import dayjs from 'dayjs'
+import MemberDetailPanel from '@/components/member/MemberDetailPanel'
 
 interface VisitAnalysisProps {
   levelFilter?: string
@@ -20,6 +22,7 @@ interface VisitAnalysisProps {
 }
 
 export default function VisitAnalysis({ levelFilter, genderFilter, ageGroupFilter, tagFilterIds = [], tagMatchAll = false }: VisitAnalysisProps) {
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
   const members = useMemo(() => generateMembers(), [])
   const consumptionRecords = useMemo(() => generateConsumptionRecords(), [])
 
@@ -536,6 +539,32 @@ export default function VisitAnalysis({ levelFilter, genderFilter, ageGroupFilte
           sortable
         />
       </Card>
+
+      <Card title="会员到店明细表" subtitle="点击姓名查看会员详情" icon={<Users className="w-5 h-5 text-indigo-500" />}>
+        <Table
+          columns={[
+            { key: 'avatar', label: '', width: 50, render: (row: Member) => <button onClick={() => setSelectedMemberId(row.id)} className="hover:ring-2 hover:ring-indigo-300 rounded-full transition-all"><img src={row.avatar} alt={row.name} className="w-8 h-8 rounded-full" /></button> },
+            { key: 'name', label: '会员姓名', render: (val: string, row: Member) => <button onClick={() => setSelectedMemberId(row.id)} className="text-indigo-600 hover:text-indigo-800 font-medium hover:underline text-left">{val}</button> },
+            { key: 'id', label: 'ID', render: (v: string) => <span className="font-mono text-xs text-gray-500">{v}</span> },
+            { key: 'level', label: '会员等级', render: (val: string) => <span className={cn('px-2 py-1 rounded-full text-xs font-medium', val === '钻石' ? 'bg-cyan-100 text-cyan-700' : val === '金卡' ? 'bg-yellow-100 text-yellow-700' : val === '银卡' ? 'bg-gray-100 text-gray-700' : 'bg-white text-gray-600 border')}>{val}</span> },
+            { key: 'visitCount', label: '累计到店', render: (v: number) => <span className="font-medium">{v} 次</span> },
+            { key: 'monthlyVisits', label: '月均到店', render: (_: any, row: Member) => <span>{(row.visitCount / 12).toFixed(1)} 次</span> },
+            { key: 'lastVisit', label: '最近到店', render: (v: string) => {
+                const days = dayjs().diff(dayjs(v), 'day')
+                return <div><div className="font-medium">{v}</div><div className="text-[10px] text-gray-400">{days}天前</div></div>
+            } },
+            { key: 'totalSpend', label: '累计消费', render: (v: number) => `¥${v.toLocaleString()}` },
+          ]}
+          data={filteredMembers}
+          pagination={{ pageSize: 10 }}
+          sortable
+        />
+      </Card>
+
+      <MemberDetailPanel
+        memberId={selectedMemberId}
+        onClose={() => setSelectedMemberId(null)}
+      />
     </div>
   )
 }

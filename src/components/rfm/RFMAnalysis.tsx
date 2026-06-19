@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import ReactECharts from 'echarts-for-react'
 import { motion } from 'framer-motion'
 import { TrendingUp, Users, AlertTriangle, Crown, Star, Clock, DollarSign } from 'lucide-react'
@@ -10,6 +10,7 @@ import { getMembersWithRFM, getRFMSummary } from '@/services/mock/members'
 import { chartTheme, commonChartOption, getRiskColor } from '@/utils/chartTheme'
 import { cn } from '@/lib/utils'
 import type { RFMScore, Member, MemberSegment } from '@/types/member'
+import MemberDetailPanel from '@/components/member/MemberDetailPanel'
 
 const segmentIcons: Record<string, React.ElementType> = {
   '高价值会员': Crown,
@@ -51,6 +52,8 @@ interface RFMAnalysisProps {
 }
 
 export default function RFMAnalysis({ levelFilter, genderFilter, ageGroupFilter, tagFilterIds = [], tagMatchAll = false }: RFMAnalysisProps) {
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null)
+
   const membersWithRFM = useMemo(() => {
     let data = getMembersWithRFM()
     if (levelFilter && levelFilter !== '全部') {
@@ -302,8 +305,8 @@ export default function RFMAnalysis({ levelFilter, genderFilter, ageGroupFilter,
   }, [membersWithRFM])
 
   const memberTableColumns = [
-    { key: 'avatar', label: '', width: 50, render: (row: Member & { rfm: RFMScore }) => <img src={row.avatar} alt={row.name} className="w-8 h-8 rounded-full" /> },
-    { key: 'name', label: '会员姓名' },
+    { key: 'avatar', label: '', width: 50, render: (row: Member & { rfm: RFMScore }) => <button onClick={() => setSelectedMemberId(row.id)} className="hover:ring-2 hover:ring-indigo-300 rounded-full transition-all"><img src={row.avatar} alt={row.name} className="w-8 h-8 rounded-full" /></button> },
+    { key: 'name', label: '会员姓名', render: (val: string, row: Member & { rfm: RFMScore }) => <button onClick={() => setSelectedMemberId(row.id)} className="text-indigo-600 hover:text-indigo-800 font-medium hover:underline text-left">{val}</button> },
     { key: 'level', label: '会员等级', render: (row: Member & { rfm: RFMScore }) => <span className={cn('px-2 py-1 rounded-full text-xs font-medium', row.level === '钻石' ? 'bg-cyan-100 text-cyan-700' : row.level === '金卡' ? 'bg-yellow-100 text-yellow-700' : row.level === '银卡' ? 'bg-gray-100 text-gray-700' : 'bg-white text-gray-600 border')}>{row.level}</span> },
     { key: 'recency', label: '最近消费(天)', dataIndex: ['rfm', 'lastConsumeDays'] },
     { key: 'frequency', label: '消费频率', dataIndex: ['rfm', 'consumeFrequency'] },
@@ -381,6 +384,11 @@ export default function RFMAnalysis({ levelFilter, genderFilter, ageGroupFilter,
           sortable
         />
       </Card>
+
+      <MemberDetailPanel
+        memberId={selectedMemberId}
+        onClose={() => setSelectedMemberId(null)}
+      />
     </div>
   )
 }
