@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { motion } from 'framer-motion'
 import ReactECharts from 'echarts-for-react'
-import { GitCompareArrows, Users, ShoppingBag, Clock, DollarSign, TrendingUp, Crown, Tag } from 'lucide-react'
+import { GitCompareArrows, Users, ShoppingBag, Clock, DollarSign, TrendingUp, Crown, Tag, Ban } from 'lucide-react'
 import type { EChartsOption } from 'echarts'
 import Card from '@/components/ui/Card'
 import { generateMembers, generateConsumptionRecords } from '@/services/mock/members'
@@ -64,10 +64,12 @@ function computeGroupStats(
     return acc
   }, {} as Record<ConsumptionCategory, number>)
 
-  const topCategory = ALL_CATEGORIES.reduce<ConsumptionCategory | null>((top, c) => {
-    if (!top || categoryAmount[c] > categoryAmount[top]) return c
-    return top
-  }, null)
+  const topCategory = memberCount > 0 && totalSpend > 0
+    ? ALL_CATEGORIES.reduce<ConsumptionCategory | null>((top, c) => {
+        if (!top || categoryAmount[c] > categoryAmount[top]) return c
+        return top
+      }, null)
+    : null
 
   const avgLastVisitDays = memberCount > 0
     ? Math.round(groupMembers.reduce((s, m) => s + dayjs().diff(dayjs(m.lastVisit), 'day'), 0) / memberCount)
@@ -92,6 +94,7 @@ function computeGroupStats(
 
 export default function GroupComparison() {
   const [dimension, setDimension] = useState<Dimension>('level')
+  const [mutexMode, setMutexMode] = useState(true)
   const members = useMemo(() => generateMembers(), [])
   const tags = useMemo(() => getAllTags(), [])
 
@@ -101,11 +104,18 @@ export default function GroupComparison() {
   const [groupAValue, setGroupAValue] = useState<string>('钻石')
   const [groupBValue, setGroupBValue] = useState<string>('金卡')
 
-  const resolveMemberIds = (value: string): string[] => {
+  const resolveMemberIds = (value: string, isGroupB: boolean = false): string[] => {
+    let ids: string[]
     if (dimension === 'level') {
-      return members.filter(m => m.level === value).map(m => m.id)
+      ids = members.filter(m => m.level === value).map(m => m.id)
+    } else {
+      ids = members.filter(m => m.tags.includes(value)).map(m => m.id)
     }
-    return members.filter(m => m.tags.includes(value)).map(m => m.id)
+    if (isGroupB && mutexMode) {
+      const aIds = new Set<string>(resolveMemberIds(groupAValue, false))
+      ids = ids.filter(id => !aIds.has(id))
+    }
+    return ids
   }
 
   const resolveLabel = (value: string): string => {
@@ -126,12 +136,13 @@ export default function GroupComparison() {
   }
 
   const statsA = useMemo(() => {
-    return computeGroupStats(resolveLabel(groupAValue), resolveColor(groupAValue), resolveMemberIds(groupAValue))
-  }, [groupAValue, dimension, members, tags])
+    return computeGroupStats(resolveLabel(groupAValue), resolveColor(groupAValue), resolveMemberIds(groupAValue, false))
+  }, [groupAValue, dimension, members, tags, mutexMode])
 
   const statsB = useMemo(() => {
-    return computeGroupStats(resolveLabel(groupBValue), resolveColor(groupBValue), resolveMemberIds(groupBValue))
-  }, [groupBValue, dimension, members, tags])
+    const label = resolveLabel(groupBValue) + (mutexMode && dimension === 'tag' ? '（不含A组）' : '')
+    return computeGroupStats(label, resolveColor(groupBValue), resolveMemberIds(groupBValue, true))
+  }, [groupBValue, groupAValue, dimension, members, tags, mutexMode])
 
   const handleDimensionChange = (dim: Dimension) => {
     setDimension(dim)
@@ -212,6 +223,22 @@ export default function GroupComparison() {
   }, [statsA, statsB])
 
   const categoryCompareOption = useMemo((): EChartsOption => {
+    if (statsA.memberCount === 0 && statsB.memberCount === 0) {
+      return {
+        title: {
+          text: '消费类目金额对比',
+          left: 'center',
+          textStyle: { fontSize: 14, fontWeight: 600 },
+        },
+        graphic: {
+          type: 'text',
+          left: 'center',
+          top: 'center',
+          style: { text: '两个群体均无数据', fontSize: 12, fill: '#9ca3af' },
+        },
+        series: [],
+      }
+    }
     return {
       title: {
         text: '消费类目金额对比',
@@ -259,45 +286,61 @@ export default function GroupComparison() {
     }
   }, [statsA, statsB])
 
-  const buildPieOption = (stats: GroupStats, sideLabel: string): EChartsOption => ({
-    title: {
-      text: sideLabel,
-      subtext: stats.label,
-      left: 'center',
-      textStyle: { fontSize: 13, fontWeight: 600, color: stats.color },
-      subtextStyle: { fontSize: 11, color: '#6b7280' },
-    },
-    tooltip: {
-      trigger: 'item',
-      formatter: (params: any) => `${params.name}: ¥${params.value.toLocaleString()} (${params.percent}%)`,
-    },
-    legend: {
-      orient: 'vertical',
-      left: 'left',
-      top: 'middle',
-      textStyle: { fontSize: 11 },
-    },
-    series: [
-      {
-        type: 'pie',
-        radius: ['42%', '68%'],
-        center: ['62%', '55%'],
-        itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
-        label: { show: true, formatter: '{b}\n{d}%', fontSize: 10 },
-        data: ALL_CATEGORIES.map(c => ({
-          name: c,
-          value: Math.round(stats.categoryAmount[c]),
-          itemStyle: { color: categoryColors[c] },
-        })),
+  const buildPieOption = (stats: GroupStats, sideLabel: string): EChartsOption => {
+    if (stats.memberCount === 0 || stats.totalSpend === 0) {
+      return {
+        title: {
+          text: sideLabel,
+          subtext: `${stats.label}\n暂无消费数据`,
+          left: 'center',
+          top: '40%',
+          textStyle: { fontSize: 13, fontWeight: 600, color: stats.color },
+          subtextStyle: { fontSize: 11, color: '#9ca3af', lineHeight: 18 },
+        },
+        series: [],
+      }
+    }
+    return {
+      title: {
+        text: sideLabel,
+        subtext: stats.label,
+        left: 'center',
+        textStyle: { fontSize: 13, fontWeight: 600, color: stats.color },
+        subtextStyle: { fontSize: 11, color: '#6b7280' },
       },
-    ],
-  })
+      tooltip: {
+        trigger: 'item',
+        formatter: (params: any) => `${params.name}: ¥${params.value.toLocaleString()} (${params.percent}%)`,
+      },
+      legend: {
+        orient: 'vertical',
+        left: 'left',
+        top: 'middle',
+        textStyle: { fontSize: 11 },
+      },
+      series: [
+        {
+          type: 'pie',
+          radius: ['42%', '68%'],
+          center: ['62%', '55%'],
+          itemStyle: { borderRadius: 6, borderColor: '#fff', borderWidth: 2 },
+          label: { show: true, formatter: '{b}\n{d}%', fontSize: 10 },
+          data: ALL_CATEGORIES.map(c => ({
+            name: c,
+            value: Math.round(stats.categoryAmount[c]),
+            itemStyle: { color: categoryColors[c] },
+          })),
+        },
+      ],
+    }
+  }
 
   const pieOptionA = useMemo(() => buildPieOption(statsA, '群体 A'), [statsA])
   const pieOptionB = useMemo(() => buildPieOption(statsB, '群体 B'), [statsB])
 
   const summaryInsight = useMemo(() => {
-    if (isSameGroup || statsA.memberCount === 0 || statsB.memberCount === 0) return null
+    if (isSameGroup) return null
+    if (statsA.memberCount === 0 || statsB.memberCount === 0) return null
     const higherAvgOrder = statsA.avgOrderValue > statsB.avgOrderValue ? statsA : statsB
     const higherVisit = statsA.avgMonthlyVisits > statsB.avgMonthlyVisits ? statsA : statsB
     const lines: string[] = []
@@ -363,7 +406,7 @@ export default function GroupComparison() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <div className="flex bg-gray-100 rounded-lg p-1">
                 <button
                   onClick={() => handleDimensionChange('level')}
@@ -386,6 +429,18 @@ export default function GroupComparison() {
                   按标签
                 </button>
               </div>
+              {dimension === 'tag' && (
+                <label className="inline-flex items-center gap-2 cursor-pointer px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs bg-white hover:bg-gray-50 transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={mutexMode}
+                    onChange={e => setMutexMode(e.target.checked)}
+                    className="w-3.5 h-3.5 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                  />
+                  <span className="text-gray-700 font-medium">互斥处理</span>
+                  <span className="text-gray-400">（B组不含A组）</span>
+                </label>
+              )}
             </div>
           </div>
 
@@ -425,56 +480,75 @@ export default function GroupComparison() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="bg-gray-50 rounded-xl p-3">
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
-                    <ShoppingBag className="w-3.5 h-3.5" />
-                    平均客单价
+              {stats.memberCount === 0 ? (
+                <div className="py-8 text-center">
+                  <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-gray-100 flex items-center justify-center">
+                    <Ban className="w-7 h-7 text-gray-400" />
                   </div>
-                  <div className="text-lg font-bold" style={{ color: stats.color }}>
-                    ¥{stats.avgOrderValue.toLocaleString()}
-                  </div>
-                </div>
-                <div className="bg-gray-50 rounded-xl p-3">
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
-                    <Clock className="w-3.5 h-3.5" />
-                    月均到店
-                  </div>
-                  <div className="text-lg font-bold" style={{ color: stats.color }}>
-                    {stats.avgMonthlyVisits}<span className="text-xs font-normal text-gray-500 ml-1">次</span>
+                  <div className="text-sm font-medium text-gray-700 mb-1">该群体暂无会员</div>
+                  <div className="text-xs text-gray-400">
+                    {mutexMode && dimension === 'tag' && idx === 1
+                      ? '互斥模式下，B组已排除所有属于A组的会员，当前没有符合条件的会员'
+                      : '当前选择的群体中没有会员数据'}
                   </div>
                 </div>
-                <div className="bg-gray-50 rounded-xl p-3">
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
-                    <DollarSign className="w-3.5 h-3.5" />
-                    人均消费
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="bg-gray-50 rounded-xl p-3">
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
+                        <ShoppingBag className="w-3.5 h-3.5" />
+                        平均客单价
+                      </div>
+                      <div className="text-lg font-bold" style={{ color: stats.color }}>
+                        ¥{stats.avgOrderValue.toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl p-3">
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
+                        <Clock className="w-3.5 h-3.5" />
+                        月均到店
+                      </div>
+                      <div className="text-lg font-bold" style={{ color: stats.color }}>
+                        {stats.avgMonthlyVisits}<span className="text-xs font-normal text-gray-500 ml-1">次</span>
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl p-3">
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
+                        <DollarSign className="w-3.5 h-3.5" />
+                        人均消费
+                      </div>
+                      <div className="text-lg font-bold" style={{ color: stats.color }}>
+                        ¥{stats.avgSpendPerMember.toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="bg-gray-50 rounded-xl p-3">
+                      <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
+                        <TrendingUp className="w-3.5 h-3.5" />
+                        累计消费
+                      </div>
+                      <div className="text-lg font-bold" style={{ color: stats.color }}>
+                        ¥{stats.totalSpend.toLocaleString()}
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-lg font-bold" style={{ color: stats.color }}>
-                    ¥{stats.avgSpendPerMember.toLocaleString()}
-                  </div>
-                </div>
-                <div className="bg-gray-50 rounded-xl p-3">
-                  <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
-                    <TrendingUp className="w-3.5 h-3.5" />
-                    累计消费
-                  </div>
-                  <div className="text-lg font-bold" style={{ color: stats.color }}>
-                    ¥{stats.totalSpend.toLocaleString()}
-                  </div>
-                </div>
-              </div>
 
-              <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
-                <span>偏好类目：</span>
-                {stats.topCategory && (
-                  <span
-                    className="px-2 py-0.5 rounded-full text-white text-xs font-medium"
-                    style={{ backgroundColor: categoryColors[stats.topCategory] }}
-                  >
-                    {stats.topCategory}
-                  </span>
-                )}
-              </div>
+                  <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
+                    <span>偏好类目：</span>
+                    {stats.topCategory && (
+                      <span
+                        className="px-2 py-0.5 rounded-full text-white text-xs font-medium"
+                        style={{ backgroundColor: categoryColors[stats.topCategory] }}
+                      >
+                        {stats.topCategory}
+                      </span>
+                    )}
+                    {!stats.topCategory && (
+                      <span className="text-gray-400">暂无消费记录</span>
+                    )}
+                  </div>
+                </>
+              )}
             </Card>
           </motion.div>
         ))}
