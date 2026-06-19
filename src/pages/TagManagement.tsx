@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Tag, Plus, Edit2, Trash2, X, Users, Palette, Check, UserPlus, Search } from 'lucide-react'
 import Button from '@/components/ui/Button'
@@ -43,6 +43,7 @@ export default function TagManagement() {
   const [memberAgeFilter, setMemberAgeFilter] = useState<string>('全部')
   const [selectedMemberIds, setSelectedMemberIds] = useState<Set<string>>(new Set())
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const tags = useMemo(() => getAllTags(), [refreshKey])
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const allMembers = useMemo(() => generateMembers(), [memberRefreshKey])
@@ -57,15 +58,11 @@ export default function TagManagement() {
     setMemberRefreshKey(k => k + 1)
   }
 
-  const handleToggleMemberTag = (memberId: string, tagId: string, currentlyHas: boolean) => {
-    if (currentlyHas) {
-      removeTagFromMember(memberId, tagId)
-    } else {
-      addTagToMember(memberId, tagId)
+  useEffect(() => {
+    if (tagMemberDialog) {
+      setSelectedMemberIds(new Set())
     }
-    setMemberRefreshKey(k => k + 1)
-    setRefreshKey(k => k + 1)
-  }
+  }, [memberSearch, memberLevelFilter, memberGenderFilter, memberAgeFilter, tagMemberDialog])
 
   const filteredMembersForTag = useMemo(() => {
     if (!tagMemberDialog) return []

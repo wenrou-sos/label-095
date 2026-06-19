@@ -78,21 +78,43 @@ const defaultTags: MemberTag[] = [
 ]
 
 let tags: MemberTag[] = [...defaultTags]
-let memberTagMap: Map<string, string[]> | null = null
+let ruleTagMap: Map<string, string[]> | null = null
 const customTagRules: Map<string, (member: Member, records: ConsumptionRecord[]) => boolean> = new Map()
+const manualTagAssignments: Map<string, Set<string>> = new Map()
+const manualTagRemovals: Map<string, Set<string>> = new Map()
 
-function resetMemberTagMap() {
-  memberTagMap = null
+function resetRuleTagMap() {
+  ruleTagMap = null
   resetMembersCache()
 }
 
-function buildMemberTagMap(): Map<string, string[]> {
-  if (memberTagMap) return memberTagMap
+function computeFinalTags(memberId: string): string[] {
+  const ruleTags = ruleTagMap?.get(memberId) || []
+  const added = manualTagAssignments.get(memberId)
+  const removed = manualTagRemovals.get(memberId)
+
+  if (!added && !removed) return ruleTags
+
+  const finalTags = new Set(ruleTags)
+  if (added) added.forEach(tid => finalTags.add(tid))
+  if (removed) removed.forEach(tid => finalTags.delete(tid))
+  return Array.from(finalTags)
+}
+
+function syncMemberTags() {
+  const members = baseGenerateMembers() as Member[]
+  members.forEach(member => {
+    member.tags = computeFinalTags(member.id)
+  })
+}
+
+function buildRuleTagMap(): Map<string, string[]> {
+  if (ruleTagMap) return ruleTagMap
 
   const members = baseGenerateMembers() as Member[]
   const records = generateConsumptionRecords()
 
-  memberTagMap = new Map()
+  ruleTagMap = new Map()
 
   members.forEach(member => {
     const memberTags: string[] = []
@@ -138,22 +160,25 @@ function buildMemberTagMap(): Map<string, string[]> {
       }
     })
 
-    memberTagMap!.set(member.id, memberTags)
-    member.tags = memberTags
+    ruleTagMap!.set(member.id, memberTags)
   })
 
-  return memberTagMap
+  syncMemberTags()
+
+  return ruleTagMap
 }
 
 export function getMemberTags(memberId: string): string[] {
-  return buildMemberTagMap().get(memberId) || []
+  buildRuleTagMap()
+  return computeFinalTags(memberId)
 }
 
 export function getAllTags(): MemberTag[] {
-  const map = buildMemberTagMap()
+  buildRuleTagMap()
+  const members = baseGenerateMembers() as Member[]
   return tags.map(tag => ({
     ...tag,
-    memberCount: Array.from(map.values()).filter(tagIds => tagIds.includes(tag.id)).length,
+    memberCount: members.filter(m => computeFinalTags(m.id).includes(tag.id)).length,
   }))
 }
 
@@ -172,11 +197,9 @@ export function createTag(data: Omit<MemberTag, 'id' | 'createdAt'>, rule?: (mem
 
   if (rule) {
     customTagRules.set(newId, rule)
-  } else {
-    customTagRules.set(newId, () => Math.random() < 0.1)
+    resetRuleTagMap()
   }
 
-  resetMemberTagMap()
   return newTag
 }
 
@@ -188,9 +211,11 @@ export function updateTag(id: string, data: Partial<Omit<MemberTag, 'id' | 'crea
 
   if (rule) {
     customTagRules.set(id, rule)
+    resetRuleTagMap()
+  } else {
+    syncMemberTags()
   }
 
-  resetMemberTagMap()
   return tags.find(t => t.id === id) || null
 }
 
@@ -201,35 +226,60 @@ export function deleteTag(id: string): boolean {
   tags = tags.filter(t => t.id !== id)
   customTagRules.delete(id)
 
-  resetMemberTagMap()
+  manualTagAssignments.forEach(tagSet => tagSet.delete(id))
+  manualTagRemovals.forEach(tagSet => tagSet.delete(id))
+
+  resetRuleTagMap()
   return true
 }
 
 export function addTagToMember(memberId: string, tagId: string): boolean {
-  const map = buildMemberTagMap()
-  const tagIds = map.get(memberId) || []
-  if (tagIds.includes(tagId)) return false
-  const newTagIds = [...tagIds, tagId]
-  map.set(memberId, newTagIds)
+  buildRuleTagMap()
+
+  const removed = manualTagRemovals.get(memberId)
+  if (removed && removed.has(tagId)) {
+    removed.delete(tagId)
+    if (removed.size === 0) manualTagRemovals.delete(memberId)
+    else manualTagRemovals.set(memberId, removed)
+  }
+
+  const ruleTags = ruleTagMap?.get(memberId) || []
+  if (ruleTags.includes(tagId)) {
+    const member = baseGenerateMembers().find(m => m.id === memberId)
+    if (member) member.tags = computeFinalTags(memberId)
+    return true
+  }
+
+  const added = manualTagAssignments.get(memberId) || new Set<string>()
+  if (added.has(tagId)) return false
+  added.add(tagId)
+  manualTagAssignments.set(memberId, added)
 
   const member = baseGenerateMembers().find(m => m.id === memberId)
-  if (member) {
-    member.tags = newTagIds
-  }
+  if (member) member.tags = computeFinalTags(memberId)
   return true
 }
 
 export function removeTagFromMember(memberId: string, tagId: string): boolean {
-  const map = buildMemberTagMap()
-  const tagIds = map.get(memberId) || []
-  if (!tagIds.includes(tagId)) return false
-  const newTagIds = tagIds.filter(tid => tid !== tagId)
-  map.set(memberId, newTagIds)
+  buildRuleTagMap()
+
+  const added = manualTagAssignments.get(memberId)
+  if (added && added.has(tagId)) {
+    added.delete(tagId)
+    if (added.size === 0) manualTagAssignments.delete(memberId)
+    else manualTagAssignments.set(memberId, added)
+  }
+
+  const ruleTags = ruleTagMap?.get(memberId) || []
+  if (ruleTags.includes(tagId)) {
+    const removed = manualTagRemovals.get(memberId) || new Set<string>()
+    if (removed.has(tagId)) return false
+    removed.add(tagId)
+    manualTagRemovals.set(memberId, removed)
+  }
 
   const member = baseGenerateMembers().find(m => m.id === memberId)
-  if (member) {
-    member.tags = newTagIds
-  }
+  if (member) member.tags = computeFinalTags(memberId)
   return true
 }
 
@@ -239,10 +289,10 @@ export function getTagById(id: string): MemberTag | undefined {
 
 export function filterMembersByTags(memberIds: string[], selectedTagIds: string[], matchAll: boolean = false): string[] {
   if (selectedTagIds.length === 0) return memberIds
-  const map = buildMemberTagMap()
+  buildRuleTagMap()
 
   return memberIds.filter(memberId => {
-    const memberTagIds = map.get(memberId) || []
+    const memberTagIds = computeFinalTags(memberId)
     if (matchAll) {
       return selectedTagIds.every(tid => memberTagIds.includes(tid))
     }

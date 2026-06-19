@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git rebase *)"
+      "Bash(git rebase *)",
+      "Bash(curl.exe -X POST \"http://192.168.10.43:38427/api/records\" -H \"Content-Type: application/json; charset=utf-8\" --data-binary \"@record.json\" -w \"\\\\n%{http_code}\")"
     ]
   }
 }
