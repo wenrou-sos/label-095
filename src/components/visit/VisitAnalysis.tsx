@@ -53,7 +53,9 @@ export default function VisitAnalysis({ levelFilter, genderFilter, ageGroupFilte
   const avgVisitsPerMonth = useMemo(() => {
     const totalVisits = filteredMembers.reduce((sum, m) => sum + m.visitCount, 0)
     const avgMemberMonths = 12
-    return (totalVisits / filteredMembers.length / avgMemberMonths).toFixed(1)
+    return filteredMembers.length > 0
+      ? (totalVisits / filteredMembers.length / avgMemberMonths).toFixed(1)
+      : '0.0'
   }, [filteredMembers])
 
   const visitDistribution = useMemo(() => {
@@ -123,6 +125,7 @@ export default function VisitAnalysis({ levelFilter, genderFilter, ageGroupFilte
 
   const correlationCoefficient = useMemo(() => {
     const n = visitAmountCorrelation.length
+    if (n === 0) return 0
     const sumX = visitAmountCorrelation.reduce((sum, d) => sum + d.monthlyVisits, 0)
     const sumY = visitAmountCorrelation.reduce((sum, d) => sum + d.totalSpend, 0)
     const sumXY = visitAmountCorrelation.reduce((sum, d) => sum + d.monthlyVisits * d.totalSpend, 0)
@@ -130,8 +133,11 @@ export default function VisitAnalysis({ levelFilter, genderFilter, ageGroupFilte
     const sumY2 = visitAmountCorrelation.reduce((sum, d) => sum + d.totalSpend * d.totalSpend, 0)
 
     const numerator = n * sumXY - sumX * sumY
-    const denominator = Math.sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY))
-    return denominator !== 0 ? parseFloat((numerator / denominator).toFixed(3)) : 0
+    const denominatorInner = (n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY)
+    if (denominatorInner <= 0 || !isFinite(denominatorInner)) return 0
+    const denominator = Math.sqrt(denominatorInner)
+    if (denominator === 0 || !isFinite(numerator)) return 0
+    return parseFloat((numerator / denominator).toFixed(3))
   }, [visitAmountCorrelation])
 
   const visitDistributionOption = useMemo((): EChartsOption => {
@@ -407,17 +413,32 @@ export default function VisitAnalysis({ levelFilter, genderFilter, ageGroupFilte
     return entries.slice(0, 3).map(([hour, count]) => ({
       time: `${hour}:00-${parseInt(hour) + 1}:00`,
       visits: count,
-      percentage: ((count / filteredRecords.length) * 100).toFixed(1),
+      percentage: filteredRecords.length > 0
+        ? ((count / filteredRecords.length) * 100).toFixed(1)
+        : '0.0',
     }))
   }, [timeDistribution, filteredRecords.length])
 
+  const safePeakHours = peakHours.length > 0 ? peakHours : [
+    { time: '-', visits: 0, percentage: '0.0' },
+    { time: '-', visits: 0, percentage: '0.0' },
+    { time: '-', visits: 0, percentage: '0.0' },
+  ]
+
   const visitTableColumns = [
     { key: 'level', label: '会员等级', render: (val: string) => <span className={cn('px-2 py-1 rounded-full text-xs font-medium', val === '钻石' ? 'bg-cyan-100 text-cyan-700' : val === '金卡' ? 'bg-yellow-100 text-yellow-700' : val === '银卡' ? 'bg-gray-100 text-gray-700' : 'bg-white text-gray-600 border')}>{val}</span> },
-    { key: 'avgMonthlyVisits', label: '月均到店次数', render: (val: number) => <span className="font-medium">{val}次</span> },
-    { key: 'avgAnnualSpend', label: '年均消费金额', render: (val: number) => `¥${val.toLocaleString()}` },
-    { key: 'memberCount', label: '会员人数' },
-    { key: 'visitsPerSpend', label: '每次到店消费', render: (_: any, row: typeof levelVisitStats[0]) => `¥${Math.round(row.avgAnnualSpend / (row.avgMonthlyVisits * 12)).toLocaleString()}` },
+    { key: 'avgMonthlyVisits', label: '月均到店次数', render: (val: number) => <span className="font-medium">{val || 0}次</span> },
+    { key: 'avgAnnualSpend', label: '年均消费金额', render: (val: number) => `¥${(val || 0).toLocaleString()}` },
+    { key: 'memberCount', label: '会员人数', render: (val: number) => val || 0 },
+    { key: 'visitsPerSpend', label: '每次到店消费', render: (_: any, row: typeof levelVisitStats[0]) => {
+      const yearlyVisits = (row.avgMonthlyVisits || 0) * 12
+      const spend = row.avgAnnualSpend || 0
+      const result = yearlyVisits > 0 ? Math.round(spend / yearlyVisits) : 0
+      return `¥${result.toLocaleString()}`
+    } },
   ]
+
+  const safeCorrelation = isNaN(correlationCoefficient) ? 0 : correlationCoefficient
 
   return (
     <div className="space-y-6">
@@ -431,29 +452,29 @@ export default function VisitAnalysis({ levelFilter, genderFilter, ageGroupFilte
           title="月均到店次数"
           value={`${avgVisitsPerMonth}次`}
           icon={<Calendar className="w-6 h-6" />}
-          trend="+0.8次"
-          trendUp={true}
+          trend={filteredMembers.length > 0 ? '+0.8次' : '-'}
+          trendUp={filteredMembers.length > 0}
         />
         <MetricCard
           title="总到店人次"
           value={filteredRecords.length.toLocaleString()}
           icon={<Users className="w-6 h-6" />}
-          trend="+23.5%"
-          trendUp={true}
+          trend={filteredMembers.length > 0 ? '+23.5%' : '-'}
+          trendUp={filteredMembers.length > 0}
         />
         <MetricCard
           title="高峰时段"
-          value={peakHours[0]?.time || '19:00-20:00'}
+          value={safePeakHours[0]?.time || '-'}
           icon={<Clock className="w-6 h-6" />}
-          trend={`${peakHours[0]?.percentage || '15'}%`}
-          trendUp={true}
+          trend={`${safePeakHours[0]?.percentage || '0.0'}%`}
+          trendUp={filteredMembers.length > 0}
         />
         <MetricCard
           title="消费相关系数"
-          value={correlationCoefficient.toString()}
+          value={safeCorrelation.toFixed(3)}
           icon={<Activity className="w-6 h-6" />}
-          trend={Math.abs(correlationCoefficient) > 0.7 ? '强相关' : '中等相关'}
-          trendUp={true}
+          trend={filteredMembers.length > 0 ? (Math.abs(safeCorrelation) > 0.7 ? '强相关' : Math.abs(safeCorrelation) > 0.4 ? '中等相关' : '弱相关') : '无数据'}
+          trendUp={filteredMembers.length > 0}
         />
       </motion.div>
 
@@ -480,7 +501,7 @@ export default function VisitAnalysis({ levelFilter, genderFilter, ageGroupFilte
       </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {peakHours.map((peak, index) => (
+        {safePeakHours.map((peak, index) => (
           <motion.div
             key={index}
             whileHover={{ scale: 1.02 }}
@@ -500,7 +521,7 @@ export default function VisitAnalysis({ levelFilter, genderFilter, ageGroupFilte
               </div>
               <div>
                 <div className="text-xl font-bold text-gray-800">{peak.time}</div>
-                <div className="text-sm text-gray-500">{peak.visits.toLocaleString()} 人次</div>
+                <div className="text-sm text-gray-500">{(peak.visits || 0).toLocaleString()} 人次</div>
               </div>
             </div>
           </motion.div>

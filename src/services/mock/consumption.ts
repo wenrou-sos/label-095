@@ -30,7 +30,7 @@ function randomFloat(min: number, max: number, decimals: number = 2): number {
 
 export function getCategoryBreakdown(memberIds?: string[]): CategoryBreakdown[] {
   let records = generateConsumptionRecords()
-  if (memberIds && memberIds.length > 0) {
+  if (memberIds !== undefined) {
     const memberIdSet = new Set(memberIds)
     records = records.filter(r => memberIdSet.has(r.memberId))
   }
@@ -58,7 +58,7 @@ export function getCategoryBreakdown(memberIds?: string[]): CategoryBreakdown[] 
 
 export function getTrendData(granularity: Granularity = 'month', memberIds?: string[]): TrendDataPoint[] {
   let records = generateConsumptionRecords()
-  if (memberIds && memberIds.length > 0) {
+  if (memberIds !== undefined) {
     const memberIdSet = new Set(memberIds)
     records = records.filter(r => memberIdSet.has(r.memberId))
   }
@@ -227,7 +227,7 @@ export function getConsumptionByTimeSlot(memberIds?: string[]): {
   data: Record<ConsumptionCategory, number[]>
 } {
   let records = generateConsumptionRecords()
-  if (memberIds && memberIds.length > 0) {
+  if (memberIds !== undefined) {
     const memberIdSet = new Set(memberIds)
     records = records.filter(r => memberIdSet.has(r.memberId))
   }
@@ -269,7 +269,7 @@ export function getConsumptionByWeekday(memberIds?: string[]): {
   data: Record<ConsumptionCategory, number[]>
 } {
   let records = generateConsumptionRecords()
-  if (memberIds && memberIds.length > 0) {
+  if (memberIds !== undefined) {
     const memberIdSet = new Set(memberIds)
     records = records.filter(r => memberIdSet.has(r.memberId))
   }
@@ -338,7 +338,7 @@ export function getCrossAnalysisDataByDimension(
   let members = generateMembers()
   let records = generateConsumptionRecords()
 
-  if (memberIds && memberIds.length > 0) {
+  if (memberIds !== undefined) {
     const memberIdSet = new Set(memberIds)
     members = members.filter(m => memberIdSet.has(m.id))
     records = records.filter(r => memberIdSet.has(r.memberId))

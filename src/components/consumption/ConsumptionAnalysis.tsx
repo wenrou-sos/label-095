@@ -62,7 +62,7 @@ export default function ConsumptionAnalysis({ levelFilter, genderFilter, ageGrou
   }, [categoryBreakdown])
 
   const avgConsumptionPerMember = useMemo(() => {
-    return totalConsumption / filteredMembers.length
+    return filteredMembers.length > 0 ? totalConsumption / filteredMembers.length : 0
   }, [totalConsumption, filteredMembers.length])
 
   const pieOption = useMemo((): EChartsOption => {
@@ -434,12 +434,15 @@ export default function ConsumptionAnalysis({ levelFilter, genderFilter, ageGrou
   ]
 
   const crossAnalysisTableData = useMemo(() => {
+    const hasData = filteredMembers.length > 0 && totalConsumption > 0
     return ['餐饮', '酒水', 'SPA', '棋牌', '客房'].map(cat => ({
       category: cat,
-      avgPerPerson: Math.round(totalConsumption / filteredMembers.length * (categoryBreakdown.find(c => c.name === cat)?.percentage || 0) / 100),
-      growthRate: (Math.random() - 0.3) * 20,
-      memberCount: Math.round(filteredMembers.length * (0.3 + Math.random() * 0.5)),
-      avgFrequency: (2 + Math.random() * 8).toFixed(1),
+      avgPerPerson: hasData
+        ? Math.round(totalConsumption / filteredMembers.length * (categoryBreakdown.find(c => c.name === cat)?.percentage || 0) / 100)
+        : 0,
+      growthRate: hasData ? (Math.random() - 0.3) * 20 : 0,
+      memberCount: hasData ? Math.round(filteredMembers.length * (0.3 + Math.random() * 0.5)) : 0,
+      avgFrequency: hasData ? (2 + Math.random() * 8).toFixed(1) : '0.0',
     }))
   }, [totalConsumption, filteredMembers.length, categoryBreakdown])
 
@@ -455,29 +458,29 @@ export default function ConsumptionAnalysis({ levelFilter, genderFilter, ageGrou
           title="总消费金额"
           value={`¥${totalConsumption.toLocaleString()}`}
           icon={<PieChart className="w-6 h-6" />}
-          trend="+15.3%"
-          trendUp={true}
+          trend={filteredMembers.length > 0 ? '+15.3%' : '-'}
+          trendUp={filteredMembers.length > 0}
         />
         <MetricCard
           title="人均消费"
           value={`¥${avgConsumptionPerMember.toFixed(0)}`}
           icon={<Target className="w-6 h-6" />}
-          trend="+8.7%"
-          trendUp={true}
+          trend={filteredMembers.length > 0 ? '+8.7%' : '-'}
+          trendUp={filteredMembers.length > 0}
         />
         <MetricCard
           title="消费类目数"
           value={categoryBreakdown.length.toString()}
           icon={<BarChart3 className="w-6 h-6" />}
-          trend="全覆盖"
-          trendUp={true}
+          trend={filteredMembers.length > 0 ? '全覆盖' : '-'}
+          trendUp={filteredMembers.length > 0}
         />
         <MetricCard
           title="活跃会员数"
           value={filteredMembers.length.toLocaleString()}
           icon={<TrendingUp className="w-6 h-6" />}
-          trend="+12.1%"
-          trendUp={true}
+          trend={filteredMembers.length > 0 ? '+12.1%' : '-'}
+          trendUp={filteredMembers.length > 0}
         />
       </motion.div>
 

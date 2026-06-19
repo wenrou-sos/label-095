@@ -209,7 +209,13 @@ export function addTagToMember(memberId: string, tagId: string): boolean {
   const map = buildMemberTagMap()
   const tagIds = map.get(memberId) || []
   if (tagIds.includes(tagId)) return false
-  map.set(memberId, [...tagIds, tagId])
+  const newTagIds = [...tagIds, tagId]
+  map.set(memberId, newTagIds)
+
+  const member = baseGenerateMembers().find(m => m.id === memberId)
+  if (member) {
+    member.tags = newTagIds
+  }
   return true
 }
 
@@ -217,7 +223,13 @@ export function removeTagFromMember(memberId: string, tagId: string): boolean {
   const map = buildMemberTagMap()
   const tagIds = map.get(memberId) || []
   if (!tagIds.includes(tagId)) return false
-  map.set(memberId, tagIds.filter(tid => tid !== tagId))
+  const newTagIds = tagIds.filter(tid => tid !== tagId)
+  map.set(memberId, newTagIds)
+
+  const member = baseGenerateMembers().find(m => m.id === memberId)
+  if (member) {
+    member.tags = newTagIds
+  }
   return true
 }
 
