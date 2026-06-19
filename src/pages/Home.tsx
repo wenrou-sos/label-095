@@ -333,7 +333,7 @@ export default function Home() {
           ))}
         </div>
 
-        {activeTab !== 'overview' && (
+        {activeTab !== 'overview' && activeTab !== 'alerts' && (
           <FilterBar
             levelFilter={levelFilter}
             genderFilter={genderFilter}

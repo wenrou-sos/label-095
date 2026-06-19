@@ -141,6 +141,7 @@ export default function AlertManagement({ onUnreadChange }: { onUnreadChange?: (
     if (!formData.name.trim()) return '请输入规则名称'
     if (!formData.metricType) return '请选择预警指标'
     if (isNaN(formData.threshold) || formData.threshold < 0) return '请输入有效的阈值'
+    if (formData.consecutiveDays !== undefined && (isNaN(formData.consecutiveDays) || formData.consecutiveDays < 1)) return '连续天数必须是大于等于1的正整数'
     if (formData.metricType === 'member_inactive_days' && !formData.filterValue) return '请选择会员等级'
     if (formData.metricType === 'space_usage_rate' && !formData.filterValue) return '请选择场地类型'
     if (formData.metricType === 'tag_member_count' && !formData.filterValue) return '请选择标签'
@@ -578,6 +579,22 @@ export default function AlertManagement({ onUnreadChange }: { onUnreadChange?: (
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    连续天数（可选，不填则满足条件立即触发）
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={formData.consecutiveDays ?? ''}
+                    onChange={e => {
+                      const val = e.target.value === '' ? undefined : Number(e.target.value)
+                      setFormData(d => ({ ...d, consecutiveDays: val }))
+                    }}
+                    placeholder="如：7 表示需连续7天都满足条件才触发"
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
                 </div>
                 {renderFilterOptions()}
                 <div>

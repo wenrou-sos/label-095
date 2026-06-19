@@ -49,6 +49,7 @@ let alertRules: AlertRule[] = [
 ]
 
 const alertRecords: AlertRecord[] = []
+const ruleConsecutiveCounter: Record<string, number> = {}
 
 function genAlertId(): string {
   return `A${Date.now()}${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`
@@ -89,15 +90,14 @@ function getMetricValue(metricType: AlertMetricType, filterValue?: string): { va
       const level = filterValue as MemberLevel | '全部'
       const filtered = level === '全部' ? members : members.filter(m => m.level === level)
       const daysSinceLastVisit = filtered.map(m => {
-        const daysDiff = dayjs().diff(dayjs(m.joinDate), 'day')
-        return m.visitCount > 0
-          ? Math.max(1, Math.floor(Math.random() * 60))
-          : daysDiff
+        const refDate = m.lastVisit || m.joinDate
+        return dayjs().diff(dayjs(refDate), 'day')
       })
       const maxDays = Math.max(...daysSinceLastVisit, 0)
+      const matchingCount = daysSinceLastVisit.filter(d => d >= 30).length
       return {
         value: maxDays,
-        label: `${level || '全部'}会员最长未到店 ${maxDays} 天`,
+        label: `${level || '全部'}会员最长未到店 ${maxDays} 天（${matchingCount}人≥30天）`,
       }
     }
 
@@ -170,9 +170,19 @@ export function runAlertCheck(): AlertRecord[] {
 
   alertRules.filter(r => r.enabled).forEach(rule => {
     const metric = getMetricValue(rule.metricType, rule.filterValue)
-    const triggered = evaluateCondition(metric.value, rule.operator, rule.threshold)
+    const conditionMet = evaluateCondition(metric.value, rule.operator, rule.threshold)
 
     rule.lastCheckedAt = now
+
+    if (conditionMet) {
+      ruleConsecutiveCounter[rule.id] = (ruleConsecutiveCounter[rule.id] || 0) + 1
+    } else {
+      ruleConsecutiveCounter[rule.id] = 0
+    }
+
+    const requiredDays = rule.consecutiveDays && rule.consecutiveDays > 0 ? rule.consecutiveDays : 1
+    const triggered = conditionMet && ruleConsecutiveCounter[rule.id] >= requiredDays
+
     if (triggered) {
       rule.lastTriggeredAt = now
       const metricInfo = ALERT_METRICS.find(m => m.type === rule.metricType)!
@@ -184,13 +194,14 @@ export function runAlertCheck(): AlertRecord[] {
 
       if (!existsRecent) {
         const filterDesc = rule.filterLabel ? `（${rule.filterLabel}）` : ''
+        const consecutiveDesc = requiredDays > 1 ? `，已连续 ${ruleConsecutiveCounter[rule.id]} 天` : ''
         const record: AlertRecord = {
           id: genAlertId(),
           ruleId: rule.id,
           ruleName: rule.name,
           metricType: rule.metricType,
           level: rule.level,
-          message: `${metricInfo.name}${filterDesc} ${metric.label}，${getOperatorText(rule.operator)}阈值 ${rule.threshold}${metricInfo.unit}`,
+          message: `${metricInfo.name}${filterDesc} ${metric.label}${consecutiveDesc}，${getOperatorText(rule.operator)}阈值 ${rule.threshold}${metricInfo.unit}`,
           value: metric.value,
           threshold: rule.threshold,
           operator: rule.operator,
@@ -227,6 +238,8 @@ export function updateAlertRule(id: string, data: Partial<Omit<AlertRule, 'id' |
   const index = alertRules.findIndex(r => r.id === id)
   if (index === -1) return null
   alertRules = alertRules.map(r => (r.id === id ? { ...r, ...data } : r))
+  ruleConsecutiveCounter[id] = 0
+  runAlertCheck()
   return alertRules.find(r => r.id === id) || null
 }
 
@@ -234,6 +247,8 @@ export function deleteAlertRule(id: string): boolean {
   const index = alertRules.findIndex(r => r.id === id)
   if (index === -1) return false
   alertRules = alertRules.filter(r => r.id !== id)
+  delete ruleConsecutiveCounter[id]
+  runAlertCheck()
   return true
 }
 
@@ -241,6 +256,8 @@ export function toggleAlertRuleEnabled(id: string): boolean {
   const rule = alertRules.find(r => r.id === id)
   if (!rule) return false
   rule.enabled = !rule.enabled
+  ruleConsecutiveCounter[id] = 0
+  runAlertCheck()
   return true
 }
 
