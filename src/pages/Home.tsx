@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { BarChart3, Users, ShoppingBag, MapPin, Sparkles, Crown, Clock, LayoutGrid, Wine, Calendar, Tag, Bell } from 'lucide-react'
+import { BarChart3, Users, ShoppingBag, MapPin, Sparkles, Crown, Clock, LayoutGrid, Wine, Calendar, Tag, Bell, GitCompareArrows } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Card from '@/components/ui/Card'
 import MetricCard from '@/components/ui/MetricCard'
@@ -13,6 +13,7 @@ import ConsumptionAnalysis from '@/components/consumption/ConsumptionAnalysis'
 import VisitAnalysis from '@/components/visit/VisitAnalysis'
 import SpaceAnalysis from '@/components/space/SpaceAnalysis'
 import RecommendAnalysis from '@/components/recommend/RecommendAnalysis'
+import GroupComparison from '@/components/comparison/GroupComparison'
 import AlertManagement from './AlertManagement'
 import { generateMembers, getRFMSummary } from '@/services/mock/members'
 import { getCategoryBreakdown } from '@/services/mock/consumption'
@@ -20,7 +21,7 @@ import { getSpaceTypeSummary } from '@/services/mock/space'
 import { getRecommendationSummary } from '@/services/mock/recommend'
 import { getUnreadAlertCount, runAlertCheck } from '@/services/mock/alerts'
 
-type TabType = 'overview' | 'rfm' | 'consumption' | 'visit' | 'space' | 'recommend' | 'alerts'
+type TabType = 'overview' | 'rfm' | 'consumption' | 'visit' | 'space' | 'recommend' | 'compare' | 'alerts'
 
 const tabs = [
   { key: 'overview' as TabType, label: '数据概览', icon: LayoutGrid, color: 'from-amber-500 to-orange-500' },
@@ -29,6 +30,7 @@ const tabs = [
   { key: 'visit' as TabType, label: '到店行为', icon: Clock, color: 'from-blue-500 to-cyan-500' },
   { key: 'space' as TabType, label: '场地利用', icon: MapPin, color: 'from-green-500 to-emerald-500' },
   { key: 'recommend' as TabType, label: '智能推荐', icon: Sparkles, color: 'from-purple-500 to-violet-500' },
+  { key: 'compare' as TabType, label: '群体对比', icon: GitCompareArrows, color: 'from-indigo-500 to-blue-500' },
   { key: 'alerts' as TabType, label: '预警管理', icon: Bell, color: 'from-rose-500 to-red-500' },
 ]
 
@@ -178,6 +180,7 @@ export default function Home() {
                 {tab.key === 'visit' && '会员到店频次、时间分布及消费相关性分析'}
                 {tab.key === 'space' && '场地使用率热力图、对比分析及排班建议'}
                 {tab.key === 'recommend' && '基于协同过滤的个性化酒款和活动推荐'}
+                {tab.key === 'compare' && '选择两个群体并排对比客单价、频次与类目偏好'}
               </p>
             </Card>
           </motion.div>
@@ -264,6 +267,8 @@ export default function Home() {
         return <SpaceAnalysis key={`space-${refreshKey}`} levelFilter={levelFilter} genderFilter={genderFilter} ageGroupFilter={ageGroupFilter} tagFilterIds={tagFilterIds} tagMatchAll={tagMatchAll} />
       case 'recommend':
         return <RecommendAnalysis key={`recommend-${refreshKey}`} levelFilter={levelFilter} genderFilter={genderFilter} ageGroupFilter={ageGroupFilter} tagFilterIds={tagFilterIds} tagMatchAll={tagMatchAll} />
+      case 'compare':
+        return <GroupComparison key={`compare-${refreshKey}`} />
       case 'alerts':
         return <AlertManagement key={`alerts-${refreshKey}`} onUnreadChange={setUnreadAlertCount} />
       default:
@@ -333,7 +338,7 @@ export default function Home() {
           ))}
         </div>
 
-        {activeTab !== 'overview' && activeTab !== 'alerts' && (
+        {activeTab !== 'overview' && activeTab !== 'alerts' && activeTab !== 'compare' && (
           <FilterBar
             levelFilter={levelFilter}
             genderFilter={genderFilter}
