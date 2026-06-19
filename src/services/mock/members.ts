@@ -132,11 +132,9 @@ function generateMember(id: string, level: MemberLevel): Member {
   }
 }
 
-function generateConsumptionRecord(memberId: string, index: number): ConsumptionRecord {
+function generateConsumptionRecord(memberId: string, index: number, date: dayjs.Dayjs): ConsumptionRecord {
   const category = weightedRandomChoice(categories, categoryWeights)
   const subCategory = randomChoice(subCategories[category])
-  const daysAgo = randomInt(1, 365)
-  const date = dayjs().subtract(daysAgo, 'day')
   const hour = randomInt(9, 23)
   const minute = randomInt(0, 59)
 
@@ -172,7 +170,7 @@ function calculateMemberRFM(member: Member, records: ConsumptionRecord[]): RFMSc
     : dayjs(member.joinDate)
 
   const lastConsumeDays = dayjs().diff(lastConsumeDate, 'day')
-  const consumeFrequency = memberRecords.length
+  const consumeFrequency = member.visitCount
   const consumeAmount = memberRecords.reduce((sum, r) => sum + r.amount, 0)
 
   const rfm = calculateRFMScore({
@@ -220,9 +218,23 @@ export function generateConsumptionRecords(): ConsumptionRecord[] {
   const records: ConsumptionRecord[] = []
 
   for (const member of members) {
-    const recordCount = randomInt(20, 50)
-    for (let i = 0; i < recordCount; i++) {
-      records.push(generateConsumptionRecord(member.id, i))
+    const lastVisitDate = dayjs(member.lastVisit)
+    const joinDate = dayjs(member.joinDate)
+    const maxDaysAgo = Math.max(1, dayjs().diff(joinDate, 'day'))
+    const visitCount = member.visitCount
+
+    for (let i = 0; i < visitCount; i++) {
+      let date: dayjs.Dayjs
+      if (i === 0) {
+        date = lastVisitDate
+      } else {
+        const daysAgo = randomInt(1, Math.min(maxDaysAgo, 365))
+        date = dayjs().subtract(daysAgo, 'day')
+        if (date.isAfter(lastVisitDate)) {
+          date = lastVisitDate.subtract(randomInt(1, Math.min(30, maxDaysAgo)), 'day')
+        }
+      }
+      records.push(generateConsumptionRecord(member.id, i, date))
     }
   }
 
@@ -292,5 +304,9 @@ export function getMemberConsumptionHistory(memberId: string): ConsumptionRecord
   const records = generateConsumptionRecords()
   return records
     .filter(r => r.memberId === memberId)
-    .sort((a, b) => dayjs(b.date).valueOf() - dayjs(a.date).valueOf())
+    .sort((a, b) => {
+      const dateDiff = dayjs(b.date).valueOf() - dayjs(a.date).valueOf()
+      if (dateDiff !== 0) return dateDiff
+      return b.time.localeCompare(a.time)
+    })
 }

@@ -200,12 +200,24 @@ export default function MemberDetailPanel({ memberId, onClose }: MemberDetailPan
   }, [history, memberId])
 
   const totalSpend = history.reduce((s, r) => s + r.amount, 0)
-  const recentRecords = history.slice(0, 8)
-  const daysSinceLastVisit = member?.lastVisit
-    ? dayjs().diff(dayjs(member.lastVisit), 'day')
+  const sortedHistory = useMemo(
+    () => [...history].sort((a, b) => {
+      const dateDiff = dayjs(b.date).valueOf() - dayjs(a.date).valueOf()
+      if (dateDiff !== 0) return dateDiff
+      return b.time.localeCompare(a.time)
+    }),
+    [history]
+  )
+  const recentRecords = sortedHistory.slice(0, 8)
+  const lastConsumeDate = sortedHistory.length > 0
+    ? sortedHistory[0].date
+    : member?.joinDate || ''
+  const daysSinceLastVisit = lastConsumeDate
+    ? dayjs().diff(dayjs(lastConsumeDate), 'day')
     : 0
-  const avgPerVisit = totalSpend > 0 && history.length > 0
-    ? Math.round(totalSpend / history.length)
+  const visitCount = member?.visitCount || 0
+  const avgPerVisit = visitCount > 0
+    ? Math.round(totalSpend / visitCount)
     : 0
 
   if (!member || !memberId) {
@@ -278,10 +290,10 @@ export default function MemberDetailPanel({ memberId, onClose }: MemberDetailPan
                 <div className="bg-white rounded-xl p-3 border border-gray-100">
                   <div className="flex items-center gap-1.5 text-xs text-gray-500 mb-1">
                     <Activity className="w-3.5 h-3.5" />
-                    消费频次
+                    到店次数
                   </div>
                   <div className="text-xl font-bold text-gray-900">
-                    {rfm?.consumeFrequency || member.visitCount}
+                    {visitCount}
                     <span className="text-xs font-normal text-gray-500 ml-1">次</span>
                   </div>
                 </div>
@@ -344,7 +356,7 @@ export default function MemberDetailPanel({ memberId, onClose }: MemberDetailPan
                     <div className="grid grid-cols-3 gap-2">
                       {[
                         { label: '最近消费 (R)', score: rfm.recency, desc: `${rfm.lastConsumeDays}天` },
-                        { label: '消费频率 (F)', score: rfm.frequency, desc: `${rfm.consumeFrequency}次` },
+                        { label: '到店频次 (F)', score: rfm.frequency, desc: `${visitCount}次` },
                         { label: '消费金额 (M)', score: rfm.monetary, desc: `¥${(rfm.consumeAmount / 1000).toFixed(1)}k` },
                       ].map(item => (
                         <div key={item.label} className="bg-gray-50 rounded-lg p-2.5 text-center">
@@ -374,7 +386,7 @@ export default function MemberDetailPanel({ memberId, onClose }: MemberDetailPan
                   </div>
                   <div className="flex items-center gap-2 text-gray-600 col-span-2">
                     <Clock className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                    <span>最近到店: {member.lastVisit} ({daysSinceLastVisit}天前)</span>
+                    <span>最近到店: {lastConsumeDate || member.lastVisit} ({daysSinceLastVisit}天前)</span>
                   </div>
                 </div>
 
@@ -421,7 +433,7 @@ export default function MemberDetailPanel({ memberId, onClose }: MemberDetailPan
                 <h4 className="text-sm font-semibold text-gray-900 mb-3 flex items-center gap-1.5">
                   <ShoppingBag className="w-4 h-4 text-orange-500" />
                   最近消费记录
-                  <span className="text-xs font-normal text-gray-500 ml-1">（共 {history.length} 条）</span>
+                  <span className="text-xs font-normal text-gray-500 ml-1">（共 {history.length} 条，按时间倒序）</span>
                 </h4>
                 {recentRecords.length > 0 ? (
                   <div className="space-y-2">
@@ -464,7 +476,7 @@ export default function MemberDetailPanel({ memberId, onClose }: MemberDetailPan
 
             <div className="px-5 py-3 border-t border-gray-100 bg-gray-50 flex items-center justify-between flex-shrink-0">
               <div className="text-xs text-gray-500">
-                共消费 {history.length} 次 · 累计 ¥{totalSpend.toLocaleString()}
+                到店 {visitCount} 次 · 消费记录 {history.length} 条 · 累计 ¥{totalSpend.toLocaleString()}
               </div>
               <button
                 onClick={onClose}
